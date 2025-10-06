@@ -11,19 +11,38 @@ export async function publishFeed(params: {
 }) {
   const agent = new BskyAgent({ service: "https://bsky.social" })
 
+  const cleanHandle = params.handle.trim().replace(/^@/, "")
+
+  console.log("[v0] Attempting to login with identifier:", cleanHandle)
+
   // Login
-  await agent.login({
-    identifier: params.handle,
-    password: params.password,
-  })
+  try {
+    await agent.login({
+      identifier: cleanHandle,
+      password: params.password,
+    })
+  } catch (error: any) {
+    console.log("[v0] Login error:", error)
+    throw new Error(`Authentication failed: ${error.message || "Invalid identifier or password"}`)
+  }
 
   // Create the feed generator record
-  const record = {
+  const record: {
+    did: string
+    displayName: string
+    description: string
+    avatar?: string
+    createdAt: string
+  } = {
     did: params.serviceDid,
     displayName: params.displayName,
     description: params.description,
-    avatar: params.avatar,
     createdAt: new Date().toISOString(),
+  }
+
+  // Only add avatar if it's provided and not empty
+  if (params.avatar && params.avatar.trim() !== "") {
+    record.avatar = params.avatar
   }
 
   const response = await agent.api.com.atproto.repo.createRecord({
@@ -42,8 +61,10 @@ export async function publishFeed(params: {
 export async function deleteFeed(params: { handle: string; password: string; recordName: string }) {
   const agent = new BskyAgent({ service: "https://bsky.social" })
 
+  const cleanHandle = params.handle.trim().replace(/^@/, "")
+
   await agent.login({
-    identifier: params.handle,
+    identifier: cleanHandle,
     password: params.password,
   })
 

@@ -129,7 +129,9 @@ export function PublishFeedDialog({ onPublished }: PublishFeedDialogProps) {
               onChange={(e) => setHandle(e.target.value)}
               className="bg-background text-foreground"
             />
-            <p className="text-xs text-muted-foreground">Your Bluesky username</p>
+            <p className="text-xs text-muted-foreground">
+              Your full Bluesky handle (e.g., username.bsky.social) - do NOT include the @ symbol
+            </p>
           </div>
 
           <div className="space-y-2">

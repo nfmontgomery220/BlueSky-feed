@@ -1,7 +1,7 @@
 export const FEED_CONFIG = {
   // Feed identification
-  serviceDid: process.env.FEEDGEN_SERVICE_DID || "did:web:example.com",
-  hostname: process.env.FEEDGEN_HOSTNAME || "feed.example.com",
+  serviceDid: process.env.FEEDGEN_SERVICE_DID || "did:web:feed.votingpublic.org",
+  hostname: process.env.FEEDGEN_HOSTNAME || "feed.votingpublic.org",
 
   // Feed metadata
   feed: {
