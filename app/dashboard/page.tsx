@@ -15,16 +15,50 @@ export default function DashboardPage() {
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
 
   const fetchStats = async () => {
-    const response = await fetch("/api/stats")
-    const data = await response.json()
-    setStats(data)
-    setDbConnected(data.totalIndexed !== undefined)
+    try {
+      const response = await fetch("/api/stats")
+
+      if (!response.ok) {
+        console.error("[v0] Stats API returned error:", response.status, response.statusText)
+        return
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("[v0] Stats API returned non-JSON response:", text)
+        return
+      }
+
+      const data = await response.json()
+      setStats(data)
+      setDbConnected(data.totalIndexed !== undefined)
+    } catch (error) {
+      console.error("[v0] Error fetching stats:", error)
+    }
   }
 
   const fetchFirehoseStatus = async () => {
-    const response = await fetch("/api/firehose")
-    const data = await response.json()
-    setFirehoseStatus(data)
+    try {
+      const response = await fetch("/api/firehose")
+
+      if (!response.ok) {
+        console.error("[v0] Firehose API returned error:", response.status, response.statusText)
+        return
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("[v0] Firehose API returned non-JSON response:", text)
+        return
+      }
+
+      const data = await response.json()
+      setFirehoseStatus(data)
+    } catch (error) {
+      console.error("[v0] Error fetching firehose status:", error)
+    }
   }
 
   const toggleFirehose = async () => {

@@ -1,3 +1,4 @@
+import "server-only"
 import type { BlueskyPost, FeedStats } from "./types"
 import { sql } from "./db"
 
