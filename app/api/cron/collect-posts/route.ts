@@ -5,9 +5,9 @@ import { shouldIndexPost } from "@/lib/feed-algorithm"
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-const sql = neon(process.env.DATABASE_URL!)
-
 export async function GET(request: Request) {
+  const sql = neon(process.env.DATABASE_URL!)
+
   // Verify this is a cron request (Vercel adds this header)
   const authHeader = request.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
