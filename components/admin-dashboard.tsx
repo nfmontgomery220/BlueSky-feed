@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Activity, Database, Play, Square, TrendingUp, ImageIcon, Filter } from "lucide-react"
+import { Activity, Database, TrendingUp, ImageIcon, Filter } from "lucide-react"
 import { StatsCard } from "@/components/stats-card"
 import { MetricChart } from "@/components/metric-chart"
 
@@ -33,7 +33,6 @@ export function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [stats, setStats] = useState<FeedStats | null>(null)
-  const [isFirehoseRunning, setIsFirehoseRunning] = useState(false)
   const [loading, setLoading] = useState(false)
   const [chartData, setChartData] = useState<{
     received: Array<{ time: string; value: number }>
@@ -69,9 +68,6 @@ export function AdminDashboard() {
           last_updated: data.last_updated,
         }
         setStats(parsedStats)
-        if (parsedStats.total_posts_received > 0) {
-          setIsFirehoseRunning(true)
-        }
       }
     } catch (error) {
       console.error("[v0] Error fetching stats:", error)
@@ -113,43 +109,6 @@ export function AdminDashboard() {
     }
   }
 
-  const handleStartFirehose = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/firehose/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      })
-      if (response.ok) {
-        setIsFirehoseRunning(true)
-        fetchStats()
-      }
-    } catch (error) {
-      console.error("[v0] Error starting firehose:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleStopFirehose = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/firehose/stop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      })
-      if (response.ok) {
-        setIsFirehoseRunning(false)
-      }
-    } catch (error) {
-      console.error("[v0] Error stopping firehose:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const calculatePercentage = (numerator: number | undefined, denominator: number | undefined): number => {
     if (!denominator || denominator === 0 || !numerator) {
       return 0
@@ -160,7 +119,9 @@ export function AdminDashboard() {
   const indexRate = calculatePercentage(stats?.total_posts_indexed, stats?.total_posts_received)
   const filterRate = calculatePercentage(stats?.posts_filtered_out, stats?.total_posts_received)
 
-  console.log("[v0] Index rate:", indexRate, "Filter rate:", filterRate)
+  const isCollecting = stats?.last_updated
+    ? Date.now() - new Date(stats.last_updated).getTime() < 120000 // Active if updated in last 2 minutes
+    : false
 
   if (!isAuthenticated) {
     return (
@@ -204,31 +165,12 @@ export function AdminDashboard() {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isFirehoseRunning ? "bg-chart-2" : "bg-muted"}`} />
-                <span className="text-sm text-muted-foreground">{isFirehoseRunning ? "Running" : "Stopped"}</span>
+                <div className={`w-2 h-2 rounded-full ${isCollecting ? "bg-chart-2" : "bg-muted"}`} />
+                <span className="text-sm text-muted-foreground">
+                  {isCollecting ? "Collecting" : "Waiting for next run"}
+                </span>
               </div>
-              {isFirehoseRunning ? (
-                <Button
-                  onClick={handleStopFirehose}
-                  disabled={loading}
-                  variant="outline"
-                  size="sm"
-                  className="border-border text-foreground hover:bg-accent bg-transparent"
-                >
-                  <Square className="w-4 h-4 mr-2" />
-                  Stop Firehose
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleStartFirehose}
-                  disabled={loading}
-                  size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  Start Firehose
-                </Button>
-              )}
+              <div className="text-xs text-muted-foreground bg-accent px-3 py-1.5 rounded-md">Cron: Every minute</div>
             </div>
           </div>
         </div>
@@ -240,9 +182,9 @@ export function AdminDashboard() {
             <div className="flex items-center gap-3">
               <Activity className="w-5 h-5 text-primary" />
               <div>
-                <h3 className="text-sm font-medium text-foreground">No Data Yet</h3>
+                <h3 className="text-sm font-medium text-foreground">Automatic Collection Active</h3>
                 <p className="text-xs text-muted-foreground">
-                  Click "Start Firehose" to begin collecting posts from Bluesky
+                  The cron job runs every minute to collect posts from Bluesky. Data will appear shortly.
                 </p>
               </div>
             </div>

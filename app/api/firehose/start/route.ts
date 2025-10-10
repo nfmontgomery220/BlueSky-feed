@@ -47,9 +47,17 @@ export async function POST(request: Request) {
 
     console.log("[v0] Firehose started, waiting for posts...")
 
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    const status = firehose.getStatus()
+    console.log("[v0] Firehose status:", status)
+
     return NextResponse.json({
       message: "Firehose started successfully",
       stats: indexer.getStats(),
+      firehoseStatus: status,
+      warning:
+        "Note: Connection will timeout after 5 minutes on Vercel. For production, use a dedicated server or Vercel Cron Jobs.",
     })
   } catch (error) {
     console.error("[v0] Error starting firehose:", error)

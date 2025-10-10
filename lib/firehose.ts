@@ -21,6 +21,7 @@ export class FirehoseConnection {
   private jetstream: Jetstream
   private onPostCallback?: (post: Post) => Promise<void>
   private isRunning = false
+  private postsReceived = 0
 
   constructor() {
     this.jetstream = new Jetstream({
@@ -36,6 +37,7 @@ export class FirehoseConnection {
 
     this.onPostCallback = onPost
     this.isRunning = true
+    this.postsReceived = 0
 
     this.jetstream.on("error", (error) => {
       console.error("[v0] Jetstream error:", error)
@@ -46,12 +48,19 @@ export class FirehoseConnection {
       this.isRunning = false
     })
 
+    this.jetstream.on("open", () => {
+      console.log("[v0] Jetstream connection opened successfully!")
+    })
+
     this.jetstream.onCreate("app.bsky.feed.post", async (event) => {
       try {
-        console.log("[v0] Received post from firehose:", event.did)
+        this.postsReceived++
+        if (this.postsReceived % 10 === 0) {
+          console.log(`[v0] Received ${this.postsReceived} posts from firehose`)
+        }
+
         const record = event.commit.record as any
 
-        // Extract post data
         const post: Post = {
           uri: event.did + "/app.bsky.feed.post/" + event.commit.rkey,
           cid: event.commit.cid,
@@ -68,7 +77,6 @@ export class FirehoseConnection {
           labels: record.labels || null,
         }
 
-        // Check for embeds
         if (record.embed) {
           post.embed_data = record.embed
 
@@ -105,6 +113,13 @@ export class FirehoseConnection {
       this.jetstream.close()
       this.isRunning = false
       console.log("[v0] Firehose connection stopped")
+    }
+  }
+
+  getStatus() {
+    return {
+      isRunning: this.isRunning,
+      postsReceived: this.postsReceived,
     }
   }
 
