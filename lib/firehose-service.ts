@@ -1,6 +1,7 @@
 import { postStore } from "./post-store"
 import { filterPost } from "./feed-filter"
 import type { BlueskyPost } from "./types"
+import { connectionLogger } from "./connection-logger"
 
 interface JetstreamEvent {
   did: string
@@ -31,19 +32,19 @@ class FirehoseService {
 
   connect(): void {
     if (this.isConnected || this.ws) {
-      console.log("[v0] Already connected to firehose")
+      connectionLogger.log("warning", "Already connected to firehose")
       return
     }
 
     const endpoint = "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post"
 
-    console.log("[v0] Connecting to Bluesky Jetstream...")
+    connectionLogger.log("info", "Attempting to connect to Bluesky Jetstream...", { endpoint })
 
     try {
       this.ws = new WebSocket(endpoint)
 
       this.ws.onopen = () => {
-        console.log("[v0] Connected to Bluesky firehose")
+        connectionLogger.log("success", "Successfully connected to Bluesky firehose")
         this.isConnected = true
         this.reconnectAttempts = 0
       }
@@ -51,30 +52,43 @@ class FirehoseService {
       this.ws.onmessage = (event) => {
         try {
           const data: JetstreamEvent = JSON.parse(event.data)
-          this.handleEvent(data)
+          this.handleEvent(data).catch((error) => {
+            connectionLogger.log("error", "Error handling firehose event", { error: String(error) })
+          })
         } catch (error) {
-          console.error("[v0] Error parsing firehose event:", error)
+          connectionLogger.log("error", "Error parsing firehose event", {
+            error: error instanceof Error ? error.message : String(error),
+          })
         }
       }
 
       this.ws.onerror = (error) => {
-        console.error("[v0] Firehose WebSocket error:", error)
+        connectionLogger.log("error", "Firehose WebSocket error", { error: String(error) })
       }
 
-      this.ws.onclose = () => {
-        console.log("[v0] Disconnected from firehose")
+      this.ws.onclose = (event) => {
+        connectionLogger.log("warning", "Disconnected from firehose", {
+          code: event.code,
+          reason: event.reason || "No reason provided",
+          wasClean: event.wasClean,
+        })
         this.isConnected = false
         this.ws = null
 
         // Attempt to reconnect
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++
-          console.log(`[v0] Reconnecting in ${this.reconnectDelay / 1000}s (attempt ${this.reconnectAttempts})...`)
+          connectionLogger.log(
+            "info",
+            `Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay / 1000}s`,
+          )
           setTimeout(() => this.connect(), this.reconnectDelay)
+        } else {
+          connectionLogger.log("error", "Max reconnection attempts reached. Please reconnect manually.")
         }
       }
     } catch (error) {
-      console.error("[v0] Error creating WebSocket connection:", error)
+      connectionLogger.log("error", "Error creating WebSocket connection", { error: String(error) })
       this.isConnected = false
       this.ws = null
     }
@@ -82,7 +96,7 @@ class FirehoseService {
 
   disconnect(): void {
     if (this.ws) {
-      console.log("[v0] Disconnecting from firehose...")
+      connectionLogger.log("info", "Manually disconnecting from firehose...")
       this.reconnectAttempts = this.maxReconnectAttempts // Prevent reconnection
       this.ws.close()
       this.ws = null
@@ -97,53 +111,60 @@ class FirehoseService {
     }
   }
 
-  private handleEvent(event: JetstreamEvent): void {
-    // Only process create operations for posts
-    if (event.commit.operation !== "create" || event.commit.collection !== "app.bsky.feed.post") {
-      return
-    }
-
-    const record = event.commit.record
-    if (!record || !record.text) {
-      return
-    }
-
-    // Convert Jetstream event to BlueskyPost format
-    const post: BlueskyPost = {
-      uri: `at://${event.did}/${event.commit.collection}/${event.commit.rkey}`,
-      cid: event.commit.cid || "",
-      author: {
-        did: event.did,
-        handle: "", // Jetstream doesn't include handle, would need to resolve separately
-      },
-      record: {
-        text: record.text,
-        createdAt: record.createdAt || new Date().toISOString(),
-        embed: record.embed,
-        facets: record.facets,
-      },
-      indexedAt: new Date().toISOString(),
-      score: 0,
-    }
-
-    // Apply filtering logic
-    const result = filterPost(post)
-
-    if (result.passed) {
-      post.score = result.score
-      postStore.addPost(post)
-
-      // Update stats
-      const stats = postStore.getStats()
-      if (post.record.embed?.images || post.record.embed?.video) {
-        postStore.updateStats({ postsWithMedia: stats.postsWithMedia + 1 })
+  private async handleEvent(event: JetstreamEvent): Promise<void> {
+    try {
+      // Only process create operations for posts
+      if (event?.commit?.operation !== "create" || event?.commit?.collection !== "app.bsky.feed.post") {
+        return
       }
-    } else {
-      // Update exclusion stats
-      const stats = postStore.getStats()
-      postStore.updateStats({
-        postsExcluded: stats.postsExcluded + 1,
-        totalFiltered: stats.totalFiltered + 1,
+
+      const record = event.commit?.record
+      if (!record || !record.text) {
+        return
+      }
+
+      // Convert Jetstream event to BlueskyPost format
+      const post: BlueskyPost = {
+        uri: `at://${event.did}/${event.commit.collection}/${event.commit.rkey}`,
+        cid: event.commit.cid || "",
+        author: {
+          did: event.did,
+          handle: "", // Jetstream doesn't include handle, would need to resolve separately
+        },
+        record: {
+          text: record.text,
+          createdAt: record.createdAt || new Date().toISOString(),
+          embed: record.embed,
+          facets: record.facets,
+        },
+        indexedAt: new Date().toISOString(),
+        score: 0,
+        hasImages: !!(record.embed?.images && Array.isArray(record.embed.images) && record.embed.images.length > 0),
+        hasVideo: !!record.embed?.video,
+      }
+
+      // Apply filtering logic
+      const result = filterPost(post)
+
+      if (result.passed) {
+        post.score = result.score
+        await postStore.addPost(post)
+
+        connectionLogger.log("info", `Post indexed: ${post.record.text.substring(0, 50)}...`, {
+          score: result.score,
+          hasMedia: post.hasImages || post.hasVideo,
+        })
+      } else {
+        connectionLogger.log("info", `Post filtered: ${result.reason}`, {
+          text: post.record.text.substring(0, 50),
+        })
+
+        await postStore.incrementFilteredOut()
+      }
+    } catch (error) {
+      connectionLogger.log("error", "Error processing firehose event", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       })
     }
   }

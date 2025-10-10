@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PublishFeedDialog } from "@/components/publish-feed-dialog"
+import { ConnectionLogs } from "@/components/connection-logs"
 import type { FeedStats } from "@/lib/types"
 
 export default function DashboardPage() {
@@ -229,6 +230,9 @@ export default function DashboardPage() {
             </div>
           </Card>
         </div>
+
+        {/* Connection Logs */}
+        <ConnectionLogs />
 
         {/* Feed Configuration */}
         <Card className="border-border bg-card p-6">

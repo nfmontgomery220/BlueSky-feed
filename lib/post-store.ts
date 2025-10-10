@@ -14,14 +14,14 @@ class PostStore {
           ${post.uri},
           ${post.cid},
           ${post.author.did},
-          ${post.author.handle},
+          ${post.author.handle || ""},
           ${post.record.text},
           ${post.record.createdAt},
           ${post.hasImages || false},
           ${post.hasVideo || false},
           ${post.hasExternalLink || false},
           ${post.externalDomain || null},
-          ${post.score},
+          ${post.score || 0},
           ${JSON.stringify(post.record.embed || null)},
           ${JSON.stringify(post.record.facets || null)},
           ${JSON.stringify(post.record.labels || null)},
@@ -43,6 +43,20 @@ class PostStore {
     } catch (error) {
       console.error("[v0] Error adding post to database:", error)
       throw error
+    }
+  }
+
+  async incrementFilteredOut(): Promise<void> {
+    try {
+      await sql`
+        UPDATE bluesky_feed_stats
+        SET posts_filtered_out = posts_filtered_out + 1,
+            total_posts_received = total_posts_received + 1,
+            last_updated = NOW()
+        WHERE id = 1
+      `
+    } catch (error) {
+      console.error("[v0] Error incrementing filtered out counter:", error)
     }
   }
 
@@ -87,6 +101,8 @@ class PostStore {
 
   async getStats(): Promise<FeedStats> {
     try {
+      console.log("[v0] PostStore: Fetching stats from database")
+
       const result = await sql`
         SELECT 
           total_posts_indexed as "totalIndexed",
@@ -98,17 +114,27 @@ class PostStore {
         WHERE id = 1
       `
 
+      console.log("[v0] PostStore: Query result:", result)
+
       if (result.length > 0) {
-        return {
-          totalIndexed: Number(result[0].totalIndexed),
-          totalFiltered: Number(result[0].totalFiltered),
-          postsWithMedia: Number(result[0].postsWithMedia),
-          postsExcluded: Number(result[0].postsExcluded),
+        const stats = {
+          totalIndexed: Number(result[0].totalIndexed) || 0,
+          totalFiltered: Number(result[0].totalFiltered) || 0,
+          postsWithMedia: Number(result[0].postsWithMedia) || 0,
+          postsExcluded: Number(result[0].postsExcluded) || 0,
           lastUpdated: result[0].lastUpdated,
         }
+        console.log("[v0] PostStore: Returning stats:", stats)
+        return stats
       }
+
+      console.log("[v0] PostStore: No stats found, returning defaults")
     } catch (error) {
-      console.error("[v0] Error fetching stats from database:", error)
+      console.error("[v0] PostStore: Error fetching stats from database:", error)
+      console.error("[v0] PostStore: Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
     }
 
     return {
@@ -117,43 +143,6 @@ class PostStore {
       postsWithMedia: 0,
       postsExcluded: 0,
       lastUpdated: new Date().toISOString(),
-    }
-  }
-
-  async updateStats(update: Partial<FeedStats>): Promise<void> {
-    try {
-      await sql`
-        INSERT INTO bluesky_feed_stats (id, total_posts_indexed, total_posts_received, posts_with_images, posts_with_video, posts_filtered_out)
-        VALUES (1, 0, 0, 0, 0, 0)
-        ON CONFLICT (id) DO NOTHING
-      `
-
-      if (update.totalIndexed !== undefined) {
-        await sql`
-          UPDATE bluesky_feed_stats
-          SET total_posts_indexed = total_posts_indexed + ${update.totalIndexed},
-              last_updated = NOW()
-          WHERE id = 1
-        `
-      }
-      if (update.totalFiltered !== undefined) {
-        await sql`
-          UPDATE bluesky_feed_stats
-          SET total_posts_received = total_posts_received + ${update.totalFiltered},
-              last_updated = NOW()
-          WHERE id = 1
-        `
-      }
-      if (update.postsExcluded !== undefined) {
-        await sql`
-          UPDATE bluesky_feed_stats
-          SET posts_filtered_out = posts_filtered_out + ${update.postsExcluded},
-              last_updated = NOW()
-          WHERE id = 1
-        `
-      }
-    } catch (error) {
-      console.error("[v0] Error updating stats:", error)
     }
   }
 
