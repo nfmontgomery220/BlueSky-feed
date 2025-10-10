@@ -79,6 +79,18 @@ export class PostIndexer {
             posts_filtered_out = ${this.stats.filteredOut},
             last_updated = NOW()
         `
+
+        await sql`
+          INSERT INTO bluesky_feed.feed_stats_history (
+            total_posts_received, total_posts_indexed,
+            posts_with_images, posts_with_video,
+            posts_filtered_out, recorded_at
+          ) VALUES (
+            ${this.stats.totalReceived}, ${this.stats.totalIndexed},
+            ${this.stats.withImages}, ${this.stats.withVideo},
+            ${this.stats.filteredOut}, NOW()
+          )
+        `
       } catch (error) {
         console.error("[v0] Error updating stats:", error)
       }

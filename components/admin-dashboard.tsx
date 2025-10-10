@@ -20,17 +20,37 @@ interface FeedStats {
   last_updated?: string
 }
 
+interface HistoricalDataPoint {
+  hour: string
+  total_posts_received: string
+  total_posts_indexed: string
+  posts_with_images: string
+  posts_with_video: string
+  posts_filtered_out: string
+}
+
 export function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [stats, setStats] = useState<FeedStats | null>(null)
   const [isFirehoseRunning, setIsFirehoseRunning] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [chartData, setChartData] = useState<{
+    received: Array<{ time: string; value: number }>
+    indexed: Array<{ time: string; value: number }>
+  }>({
+    received: [],
+    indexed: [],
+  })
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchStats()
-      const interval = setInterval(fetchStats, 10000) // Update every 10 seconds
+      fetchHistory()
+      const interval = setInterval(() => {
+        fetchStats()
+        fetchHistory()
+      }, 30000) // Update every 30 seconds
       return () => clearInterval(interval)
     }
   }, [isAuthenticated])
@@ -40,7 +60,6 @@ export function AdminDashboard() {
       const response = await fetch("/api/firehose/stats")
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] Fetched stats:", data)
         const parsedStats: FeedStats = {
           total_posts_received: Number(data.total_posts_received) || 0,
           total_posts_indexed: Number(data.total_posts_indexed) || 0,
@@ -56,6 +75,34 @@ export function AdminDashboard() {
       }
     } catch (error) {
       console.error("[v0] Error fetching stats:", error)
+    }
+  }
+
+  const fetchHistory = async () => {
+    try {
+      const response = await fetch("/api/firehose/history")
+      if (response.ok) {
+        const data = await response.json()
+        const history: HistoricalDataPoint[] = data.history || []
+
+        // Format data for charts
+        const receivedData = history.map((point) => ({
+          time: new Date(point.hour).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
+          value: Number(point.total_posts_received) || 0,
+        }))
+
+        const indexedData = history.map((point) => ({
+          time: new Date(point.hour).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
+          value: Number(point.total_posts_indexed) || 0,
+        }))
+
+        setChartData({
+          received: receivedData,
+          indexed: indexedData,
+        })
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching history:", error)
     }
   }
 
@@ -212,30 +259,14 @@ export function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <MetricChart
             title="Posts Received"
-            description="Total posts from firehose"
-            data={[
-              { time: "12h ago", value: 2800 },
-              { time: "10h ago", value: 2650 },
-              { time: "8h ago", value: 2400 },
-              { time: "6h ago", value: 2200 },
-              { time: "4h ago", value: 2100 },
-              { time: "2h ago", value: 2300 },
-              { time: "Now", value: stats?.total_posts_received || 2500 },
-            ]}
+            description="Total posts from firehose over last 24 hours"
+            data={chartData.received.length > 0 ? chartData.received : [{ time: "Now", value: 0 }]}
             color="hsl(var(--chart-1))"
           />
           <MetricChart
             title="Posts Indexed"
-            description="Successfully indexed posts"
-            data={[
-              { time: "12h ago", value: 1800 },
-              { time: "10h ago", value: 1650 },
-              { time: "8h ago", value: 1500 },
-              { time: "6h ago", value: 1400 },
-              { time: "4h ago", value: 1350 },
-              { time: "2h ago", value: 1500 },
-              { time: "Now", value: stats?.total_posts_indexed || 1600 },
-            ]}
+            description="Successfully indexed posts over last 24 hours"
+            data={chartData.indexed.length > 0 ? chartData.indexed : [{ time: "Now", value: 0 }]}
             color="hsl(var(--chart-2))"
           />
         </div>
