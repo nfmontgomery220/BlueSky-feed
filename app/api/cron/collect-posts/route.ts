@@ -8,13 +8,15 @@ export const maxDuration = 60
 export async function GET(request: Request) {
   const sql = neon(process.env.DATABASE_URL!)
 
-  // Verify this is a cron request (Vercel adds this header)
   const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isCronRequest = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  const isManualTrigger = authHeader === `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD}`
+
+  if (!isCronRequest && !isManualTrigger) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  console.log("[v0] Cron job started - collecting posts")
+  console.log("[v0] Collection started - collecting posts")
 
   let postsReceived = 0
   let postsIndexed = 0
@@ -127,7 +129,9 @@ export async function GET(request: Request) {
       )
     `
 
-    console.log(`[v0] Cron completed: ${postsReceived} received, ${postsIndexed} indexed, ${postsFiltered} filtered`)
+    console.log(
+      `[v0] Collection completed: ${postsReceived} received, ${postsIndexed} indexed, ${postsFiltered} filtered`,
+    )
 
     return Response.json({
       success: true,
@@ -138,7 +142,7 @@ export async function GET(request: Request) {
       postsWithVideo,
     })
   } catch (error) {
-    console.error("[v0] Cron job error:", error)
+    console.error("[v0] Collection job error:", error)
     return Response.json({ error: "Failed to collect posts", details: String(error) }, { status: 500 })
   }
 }

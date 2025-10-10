@@ -34,6 +34,8 @@ export function AdminDashboard() {
   const [password, setPassword] = useState("")
   const [stats, setStats] = useState<FeedStats | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isCollectingManually, setIsCollectingManually] = useState(false)
+  const [lastCollectionResult, setLastCollectionResult] = useState<string>("")
   const [chartData, setChartData] = useState<{
     received: Array<{ time: string; value: number }>
     indexed: Array<{ time: string; value: number }>
@@ -116,6 +118,36 @@ export function AdminDashboard() {
     return Math.round((numerator / denominator) * 100)
   }
 
+  const handleManualCollection = async () => {
+    setIsCollectingManually(true)
+    setLastCollectionResult("")
+    try {
+      const response = await fetch("/api/cron/collect-posts", {
+        headers: {
+          Authorization: `Bearer ${password}`,
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setLastCollectionResult(
+          `✓ Collected ${result.postsReceived} posts, indexed ${result.postsIndexed}, filtered ${result.postsFiltered}`,
+        )
+        // Refresh stats immediately
+        await fetchStats()
+        await fetchHistory()
+      } else {
+        const error = await response.json()
+        setLastCollectionResult(`✗ Error: ${error.error || "Failed to collect"}`)
+      }
+    } catch (error) {
+      console.error("[v0] Manual collection error:", error)
+      setLastCollectionResult(`✗ Error: ${String(error)}`)
+    } finally {
+      setIsCollectingManually(false)
+    }
+  }
+
   const indexRate = calculatePercentage(stats?.total_posts_indexed, stats?.total_posts_received)
   const filterRate = calculatePercentage(stats?.posts_filtered_out, stats?.total_posts_received)
 
@@ -164,6 +196,14 @@ export function AdminDashboard() {
               <p className="text-sm text-muted-foreground">Bluesky Feed Monitoring</p>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                onClick={handleManualCollection}
+                disabled={isCollectingManually}
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isCollectingManually ? "Collecting..." : "Collect Now"}
+              </Button>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isCollecting ? "bg-chart-2" : "bg-muted"}`} />
                 <span className="text-sm text-muted-foreground">
@@ -173,24 +213,15 @@ export function AdminDashboard() {
               <div className="text-xs text-muted-foreground bg-accent px-3 py-1.5 rounded-md">Cron: Every minute</div>
             </div>
           </div>
+          {lastCollectionResult && (
+            <div className="mt-3 text-xs text-muted-foreground bg-accent px-3 py-2 rounded-md">
+              {lastCollectionResult}
+            </div>
+          )}
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        {!stats?.total_posts_received && (
-          <Card className="p-6 bg-card border-border mb-6">
-            <div className="flex items-center gap-3">
-              <Activity className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="text-sm font-medium text-foreground">Automatic Collection Active</h3>
-                <p className="text-xs text-muted-foreground">
-                  The cron job runs every minute to collect posts from Bluesky. Data will appear shortly.
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatsCard title="Posts Received" value={stats?.total_posts_received || 0} icon={Activity} />
           <StatsCard title="Posts Indexed" value={stats?.total_posts_indexed || 0} icon={Database} />
