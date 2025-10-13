@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Activity, Database, TrendingUp, ImageIcon, Filter } from "lucide-react"
 import { StatsCard } from "@/components/stats-card"
 import { MetricChart } from "@/components/metric-chart"
+import { DatabaseManagement } from "@/components/database-management"
 
 interface FeedStats {
   total_posts_received: number
@@ -43,6 +43,7 @@ export function AdminDashboard() {
     received: [],
     indexed: [],
   })
+  const [activeTab, setActiveTab] = useState<"overview" | "database">("overview")
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -214,6 +215,22 @@ export function AdminDashboard() {
               <p className="text-sm text-muted-foreground">Bluesky Feed Monitoring</p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex gap-2 mr-4">
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant={activeTab === "overview" ? "default" : "outline"}
+                  size="sm"
+                >
+                  Overview
+                </Button>
+                <Button
+                  onClick={() => setActiveTab("database")}
+                  variant={activeTab === "database" ? "default" : "outline"}
+                  size="sm"
+                >
+                  Database
+                </Button>
+              </div>
               <Button
                 onClick={handleManualCollection}
                 disabled={isCollectingManually}
@@ -240,69 +257,75 @@ export function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard title="Posts Received" value={stats?.total_posts_received || 0} icon={Activity} />
-          <StatsCard title="Posts Indexed" value={stats?.total_posts_indexed || 0} icon={Database} />
-          <StatsCard title="With Images" value={stats?.posts_with_images || 0} icon={ImageIcon} />
-          <StatsCard title="Filtered Out" value={stats?.posts_filtered_out || 0} icon={Filter} />
-        </div>
+        {activeTab === "overview" ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <StatsCard title="Posts Received" value={stats?.total_posts_received || 0} icon={Activity} />
+              <StatsCard title="Posts Indexed" value={stats?.total_posts_indexed || 0} icon={Database} />
+              <StatsCard title="With Images" value={stats?.posts_with_images || 0} icon={ImageIcon} />
+              <StatsCard title="Filtered Out" value={stats?.posts_filtered_out || 0} icon={Filter} />
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <MetricChart
-            title="Posts Received"
-            description="Total posts from firehose over last 24 hours"
-            data={chartData.received.length > 0 ? chartData.received : [{ time: "Now", value: 0 }]}
-            color="hsl(var(--chart-1))"
-          />
-          <MetricChart
-            title="Posts Indexed"
-            description="Successfully indexed posts over last 24 hours"
-            data={chartData.indexed.length > 0 ? chartData.indexed : [{ time: "Now", value: 0 }]}
-            color="hsl(var(--chart-2))"
-          />
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <MetricChart
+                title="Posts Received"
+                description="Total posts from firehose over last 24 hours"
+                data={chartData.received.length > 0 ? chartData.received : [{ time: "Now", value: 0 }]}
+                color="hsl(var(--chart-1))"
+              />
+              <MetricChart
+                title="Posts Indexed"
+                description="Successfully indexed posts over last 24 hours"
+                data={chartData.indexed.length > 0 ? chartData.indexed : [{ time: "Now", value: 0 }]}
+                color="hsl(var(--chart-2))"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-3 mb-4">
-              <ImageIcon className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="text-sm font-medium text-foreground">Media Content</h3>
-                <p className="text-xs text-muted-foreground">Posts with images and video</p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Images</span>
-                <span className="text-lg font-semibold text-foreground">{stats?.posts_with_images || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Videos</span>
-                <span className="text-lg font-semibold text-foreground">{stats?.posts_with_video || 0}</span>
-              </div>
-            </div>
-          </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="p-6 bg-card border-border">
+                <div className="flex items-center gap-3 mb-4">
+                  <ImageIcon className="w-5 h-5 text-primary" />
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">Media Content</h3>
+                    <p className="text-xs text-muted-foreground">Posts with images and video</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Images</span>
+                    <span className="text-lg font-semibold text-foreground">{stats?.posts_with_images || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Videos</span>
+                    <span className="text-lg font-semibold text-foreground">{stats?.posts_with_video || 0}</span>
+                  </div>
+                </div>
+              </Card>
 
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="text-sm font-medium text-foreground">Feed Health</h3>
-                <p className="text-xs text-muted-foreground">System performance metrics</p>
-              </div>
+              <Card className="p-6 bg-card border-border">
+                <div className="flex items-center gap-3 mb-4">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">Feed Health</h3>
+                    <p className="text-xs text-muted-foreground">System performance metrics</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Index Rate</span>
+                    <span className="text-lg font-semibold text-chart-2">{indexRate}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Filter Rate</span>
+                    <span className="text-lg font-semibold text-chart-3">{filterRate}%</span>
+                  </div>
+                </div>
+              </Card>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Index Rate</span>
-                <span className="text-lg font-semibold text-chart-2">{indexRate}%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Filter Rate</span>
-                <span className="text-lg font-semibold text-chart-3">{filterRate}%</span>
-              </div>
-            </div>
-          </Card>
-        </div>
+          </>
+        ) : (
+          <DatabaseManagement password={password} />
+        )}
       </main>
     </div>
   )
