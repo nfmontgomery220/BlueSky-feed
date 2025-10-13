@@ -134,14 +134,17 @@ export function AdminDashboard() {
       console.log("[v0] Response headers:", Object.fromEntries(response.headers.entries()))
 
       const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
+      let result
+
+      if (contentType?.includes("application/json")) {
+        result = await response.json()
+      } else {
         const text = await response.text()
         console.error("[v0] Non-JSON response:", text)
-        setLastCollectionResult(`✗ Error: Server returned non-JSON response (${response.status})`)
+        setLastCollectionResult(`✗ Error: Server error (${response.status}). Check server logs.`)
         return
       }
 
-      const result = await response.json()
       console.log("[v0] Response data:", result)
 
       if (response.ok) {
@@ -152,7 +155,8 @@ export function AdminDashboard() {
         await fetchStats()
         await fetchHistory()
       } else {
-        setLastCollectionResult(`✗ Error: ${result.error || "Failed to collect"}`)
+        const errorMsg = result.details ? `${result.error}: ${result.details}` : result.error || "Unknown error"
+        setLastCollectionResult(`✗ Error: ${errorMsg}`)
       }
     } catch (error) {
       console.error("[v0] Manual collection error:", error)

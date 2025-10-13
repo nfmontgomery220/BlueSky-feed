@@ -74,13 +74,15 @@ export async function GET(request: Request) {
           if (shouldIndex) {
             postsIndexed++
 
+            const uri = `at://${event.did}/${event.commit.collection}/${event.commit.rkey}`
+
             // Store in database
             await sql`
               INSERT INTO bluesky_feed.posts (
                 uri, cid, author_did, text, created_at, indexed_at,
                 has_images, has_video, has_external_link, langs
               ) VALUES (
-                ${event.commit.uri},
+                ${uri},
                 ${event.commit.cid},
                 ${event.did},
                 ${post.text || ""},
