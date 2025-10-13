@@ -1,118 +1,169 @@
-# Bluesky Feed Generator
+# Bluesky Civics Feed Generator
 
-A production-ready Bluesky feed generator built with Next.js, featuring automated post collection via Vercel Cron Jobs and real-time monitoring dashboard.
+A production-ready Bluesky feed generator for civic engagement content, featuring AI-powered content analysis, automated filtering, and manual review capabilities.
 
-## Features
+## Overview
 
-- **Automated Post Collection**: Vercel Cron Jobs collect posts every minute from Bluesky's firehose
-- **Real-time Monitoring**: Admin dashboard with live stats and historical charts
-- **Configurable Feed Algorithm**: Customize which posts to index based on content, language, media, etc.
-- **AT Protocol Integration**: Full support for Bluesky's feed generator protocol
-- **Database Storage**: Efficient post storage and retrieval using Neon PostgreSQL
+This feed generator collects posts from Bluesky related to voting, elections, and civic engagement, then uses AI to analyze and filter them for quality and relevance. It provides a two-stage filtering system with automated quality control and manual review capabilities.
 
-## Architecture
+## Key Features
 
-This feed generator uses a **cron-based architecture** optimized for Vercel's serverless platform:
+- **Automated Collection**: Vercel Cron Jobs collect posts every minute from Bluesky's firehose
+- **AI Content Analysis**: Automatic topic classification, sentiment analysis, and quality scoring
+- **Two-Stage Filtering**: Broad hashtag collection → AI analysis → quality filtering
+- **Manual Review Queue**: Review borderline posts before they appear in the feed
+- **Real-time Dashboard**: Monitor stats, manage database, and review posts
+- **Database Management**: Built-in tools to manage storage and clean up old data
+- **AT Protocol Integration**: Full Bluesky feed generator protocol support
 
-- **Cron Job** (`/api/cron/collect-posts`): Runs every minute, collects posts for 50 seconds, then exits
-- **Historical Tracking**: Saves stats snapshots every minute for time-series charts
-- **Feed API**: Serves posts via AT Protocol endpoints for Bluesky integration
+## System Architecture
 
-## Environment Variables
+\`\`\`
+Bluesky Firehose → Collection (hashtags) → AI Analysis → Filtering → Review Queue → Public Feed
+                         ↓                      ↓            ↓            ↓
+                    Database (pending)    Add codes    Auto-approve  Manual review
+                                                       Auto-reject
+\`\`\`
 
-Required environment variables (automatically configured via integrations):
+### Data Flow
+
+1. **Collection** (`/api/cron/collect-posts`): Cron job runs every minute
+   - Connects to Bluesky firehose for 50 seconds
+   - Filters by civics-related hashtags/keywords
+   - Stores posts with status: `pending_analysis`
+
+2. **AI Analysis** (`/api/posts/analyze`): Analyzes collected posts
+   - Topic classification (voter registration, election integrity, etc.)
+   - Sentiment analysis (-1 to +1 scale)
+   - Quality scoring (0 to 1, spam/misinformation detection)
+   - Actionability detection (call-to-action vs informational)
+
+3. **Automated Filtering**: Based on analysis results
+   - Quality > 0.6 → Auto-approve (status: `approved`)
+   - Quality < 0.3 → Auto-reject (status: `rejected`)
+   - Quality 0.3-0.6 → Manual review (status: `needs_review`)
+
+4. **Manual Review** (`/api/posts/review`): Admin reviews borderline posts
+   - Approve or reject with notes
+   - Corrections improve future AI accuracy
+
+5. **Public Feed** (`/xrpc/app.bsky.feed.getFeedSkeleton`): Serves approved posts
+   - Only `approved` posts appear in the public feed
+   - Sorted by relevance and recency
+
+## Quick Start
+
+### 1. Deploy to Vercel
+
+\`\`\`bash
+# Push to GitHub
+git push origin main
+
+# Connect to Vercel and deploy
+\`\`\`
+
+### 2. Add Integrations
+
+- **Neon Database**: Add from Vercel integrations
+- **Vercel AI Gateway**: Automatically configured
+
+### 3. Set Environment Variables
 
 \`\`\`env
-# Database (Neon Integration)
+# Database (from Neon integration)
 DATABASE_URL=postgresql://...
 
-# Bluesky Feed Configuration
+# Feed Configuration
 FEEDGEN_HOSTNAME=feed.votingpublic.org
 FEEDGEN_SERVICE_DID=did:web:feed.votingpublic.org
 BLUESKY_DID=your-bluesky-did
 
-# Admin Access (server-side only, never use NEXT_PUBLIC_ prefix)
+# Security
 ADMIN_PASSWORD=your-secure-password
-
-# Cron Security (Vercel automatically provides this)
-CRON_SECRET=your-cron-secret
+CRON_SECRET=auto-generated-by-vercel
 \`\`\`
 
-## Setup
+### 4. Run Database Migrations
 
-1. **Deploy to Vercel**: Push to GitHub and connect to Vercel
-2. **Add Neon Integration**: Connect Neon database from Vercel dashboard
-3. **Run Migrations**: Execute the SQL scripts in order:
-   - `scripts/run-003-migration.mjs` (creates historical_stats table)
-4. **Set Environment Variables**: Add ADMIN_PASSWORD and CRON_SECRET
-5. **Deploy**: Vercel will automatically set up the cron job
+Execute in order:
+1. `scripts/run-003-migration.mjs` - Historical stats table
+2. `scripts/run-004-migration.mjs` - AI analysis fields
 
-## Cron Job Configuration
+### 5. Access Admin Dashboard
 
-The cron job is configured in `vercel.json`:
+Visit your deployment URL and log in with `ADMIN_PASSWORD`.
 
-\`\`\`json
-{
-  "crons": [
-    {
-      "path": "/api/cron/collect-posts",
-      "schedule": "* * * * *"
-    }
-  ]
-}
-\`\`\`
+## Documentation
 
-Schedule format: `* * * * *` (every minute)
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and technical details
+- **[DATABASE.md](./DATABASE.md)** - Complete database schema documentation
+- **[API.md](./API.md)** - API endpoints reference
+- **[AI_ANALYSIS.md](./AI_ANALYSIS.md)** - How AI analysis and filtering works
+- **[MAINTENANCE.md](./MAINTENANCE.md)** - Database management and ongoing tasks
+- **[FEED_CONFIGURATION.md](./FEED_CONFIGURATION.md)** - Customizing hashtags and keywords
 
-## Feed Algorithm
+## Admin Dashboard Features
 
-Customize the feed algorithm in `lib/feed-algorithm.ts`:
+### Stats Overview
+- Total posts received, indexed, filtered
+- Posts with images/video
+- Real-time collection status
 
-\`\`\`typescript
-export function shouldIndexPost(post: any): boolean {
-  // Add your custom logic here
-  // Examples:
-  // - Filter by language
-  // - Require images/video
-  // - Check for specific keywords
-  // - Filter by author
-  
-  return true // Index all posts by default
-}
-\`\`\`
+### Historical Charts
+- Posts per hour over last 24 hours
+- Filter rate trends
+- Index rate visualization
 
-## Admin Dashboard
+### Database Management
+- View storage metrics (total posts, oldest/newest)
+- Clean up old posts (configurable retention period)
+- Delete historical stats
+- Optimize database
 
-Access the admin dashboard at your deployment URL (e.g., `https://feed.votingpublic.org`):
+### Review Queue
+- Review posts flagged for manual review
+- Approve or reject with notes
+- View AI analysis results
+- Correct AI suggestions
 
-- **Login**: Enter admin password
-- **Monitor Stats**: View real-time post counts and metrics
-- **View Charts**: Historical data over last 24 hours
-- **System Status**: See when last cron job ran
+## Cost Considerations
 
-## AT Protocol Endpoints
+### AI Analysis Costs
+- Model: GPT-4o-mini via Vercel AI Gateway
+- Cost: ~$0.001-0.003 per post analyzed
+- Volume: If collecting 100 posts/minute = $4-12/day
 
-The feed generator exposes these endpoints for Bluesky:
+### Database Storage
+- ~500-2000 bytes per post
+- 100 posts/minute = ~144,000 posts/day = 70-300 MB/day
+- Use database management tools to control growth
 
-- `/.well-known/did.json` - DID document
-- `/xrpc/app.bsky.feed.describeFeedGenerator` - Feed metadata
-- `/xrpc/app.bsky.feed.getFeedSkeleton` - Feed posts
+### Vercel Hosting
+- Cron jobs: Included in Pro plan
+- Serverless functions: Generous free tier
+- Bandwidth: Depends on feed usage
 
-## Database Schema
+## Troubleshooting
 
-### Tables
+**Cron not collecting posts?**
+- Check Vercel deployment logs
+- Verify `CRON_SECRET` is set
+- Ensure database connection is working
 
-**bluesky_feed.posts**
-- Stores indexed posts with metadata
-- Includes text, author, timestamps, media flags
+**AI analysis not running?**
+- Check Vercel AI Gateway is configured
+- Verify posts have `pending_analysis` status
+- Check API logs for errors
 
-**bluesky_feed.feed_stats**
-- Current cumulative statistics
-- Updated every minute by cron job
+**Posts not appearing in feed?**
+- Check post status (must be `approved`)
+- Run AI analysis on pending posts
+- Review and approve posts in review queue
 
-**bluesky_feed.historical_stats**
-- Time-series data for charts
-- One row per minute
+**Database filling up too fast?**
+- Use database management tools to clean up old posts
+- Adjust retention period (default: 30 days)
+- Consider more aggressive quality filtering
 
 ## Development
 
@@ -126,23 +177,6 @@ pnpm dev
 # Build for production
 pnpm build
 \`\`\`
-
-## Troubleshooting
-
-**Cron job not running?**
-- Check Vercel deployment logs
-- Verify CRON_SECRET is set (Vercel sets this automatically)
-- Ensure vercel.json is in the root directory
-
-**No posts appearing?**
-- Wait 1-2 minutes for first cron run
-- Check `/api/cron/collect-posts` logs in Vercel
-- Verify DATABASE_URL is correct
-
-**Charts not showing data?**
-- Ensure historical_stats table exists (run migration)
-- Wait for multiple cron runs to accumulate data points
-- Check browser console for API errors
 
 ## License
 
