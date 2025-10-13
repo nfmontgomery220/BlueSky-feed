@@ -31,9 +31,8 @@ FEEDGEN_HOSTNAME=feed.votingpublic.org
 FEEDGEN_SERVICE_DID=did:web:feed.votingpublic.org
 BLUESKY_DID=your-bluesky-did
 
-# Admin Access
+# Admin Access (server-side only, never use NEXT_PUBLIC_ prefix)
 ADMIN_PASSWORD=your-secure-password
-NEXT_PUBLIC_ADMIN_PASSWORD=your-secure-password
 
 # Cron Security (Vercel automatically provides this)
 CRON_SECRET=your-cron-secret
@@ -45,7 +44,7 @@ CRON_SECRET=your-cron-secret
 2. **Add Neon Integration**: Connect Neon database from Vercel dashboard
 3. **Run Migrations**: Execute the SQL scripts in order:
    - `scripts/run-003-migration.mjs` (creates historical_stats table)
-4. **Set Environment Variables**: Add ADMIN_PASSWORD and other required vars
+4. **Set Environment Variables**: Add ADMIN_PASSWORD and CRON_SECRET
 5. **Deploy**: Vercel will automatically set up the cron job
 
 ## Cron Job Configuration

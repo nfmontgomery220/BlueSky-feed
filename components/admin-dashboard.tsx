@@ -106,7 +106,7 @@ export function AdminDashboard() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password) {
+    if (password) {
       setIsAuthenticated(true)
     }
   }
@@ -122,14 +122,29 @@ export function AdminDashboard() {
     setIsCollectingManually(true)
     setLastCollectionResult("")
     try {
+      console.log("[v0] Starting manual collection...")
       const response = await fetch("/api/cron/collect-posts", {
+        method: "GET", // explicitly set method
         headers: {
           Authorization: `Bearer ${password}`,
         },
       })
 
+      console.log("[v0] Response status:", response.status)
+      console.log("[v0] Response headers:", Object.fromEntries(response.headers.entries()))
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("[v0] Non-JSON response:", text)
+        setLastCollectionResult(`✗ Error: Server returned non-JSON response (${response.status})`)
+        return
+      }
+
+      const result = await response.json()
+      console.log("[v0] Response data:", result)
+
       if (response.ok) {
-        const result = await response.json()
         setLastCollectionResult(
           `✓ Collected ${result.postsReceived} posts, indexed ${result.postsIndexed}, filtered ${result.postsFiltered}`,
         )
@@ -137,12 +152,11 @@ export function AdminDashboard() {
         await fetchStats()
         await fetchHistory()
       } else {
-        const error = await response.json()
-        setLastCollectionResult(`✗ Error: ${error.error || "Failed to collect"}`)
+        setLastCollectionResult(`✗ Error: ${result.error || "Failed to collect"}`)
       }
     } catch (error) {
       console.error("[v0] Manual collection error:", error)
-      setLastCollectionResult(`✗ Error: ${String(error)}`)
+      setLastCollectionResult(`✗ Error: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsCollectingManually(false)
     }
