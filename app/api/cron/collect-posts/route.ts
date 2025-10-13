@@ -122,7 +122,7 @@ export async function GET(request: Request) {
     await sql`
       INSERT INTO bluesky_feed.feed_stats (
         id, total_posts_received, total_posts_indexed, posts_with_images,
-        posts_with_video, posts_filtered_out, last_post_at, updated_at
+        posts_with_video, posts_filtered_out, last_updated
       ) VALUES (
         1,
         ${postsReceived},
@@ -130,7 +130,6 @@ export async function GET(request: Request) {
         ${postsWithImages},
         ${postsWithVideo},
         ${postsFiltered},
-        NOW(),
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -139,14 +138,13 @@ export async function GET(request: Request) {
         posts_with_images = bluesky_feed.feed_stats.posts_with_images + ${postsWithImages},
         posts_with_video = bluesky_feed.feed_stats.posts_with_video + ${postsWithVideo},
         posts_filtered_out = bluesky_feed.feed_stats.posts_filtered_out + ${postsFiltered},
-        last_post_at = NOW(),
-        updated_at = NOW()
+        last_updated = NOW()
     `
 
     // Save historical snapshot
     await sql`
       INSERT INTO bluesky_feed.historical_stats (
-        posts_received, posts_indexed, posts_filtered, recorded_at
+        posts_received, posts_indexed, posts_filtered, timestamp
       ) VALUES (
         ${postsReceived},
         ${postsIndexed},
