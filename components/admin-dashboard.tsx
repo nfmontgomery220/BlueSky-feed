@@ -1,332 +1,378 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Activity, Database, TrendingUp, ImageIcon, Filter } from "lucide-react"
-import { StatsCard } from "@/components/stats-card"
-import { MetricChart } from "@/components/metric-chart"
-import { DatabaseManagement } from "@/components/database-management"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "@/components/ui/badge"
+import { Activity, Database, Users, ImageIcon, Video, Link, TrendingUp, HardDrive, AlertCircle } from "lucide-react"
 
-interface FeedStats {
-  total_posts_received: number
-  total_posts_indexed: number
-  posts_with_images: number
-  posts_with_video: number
-  posts_filtered_out: number
-  last_updated?: string
-}
-
-interface HistoricalDataPoint {
-  hour: string
-  total_posts_received: string
-  total_posts_indexed: string
-  posts_with_images: string
-  posts_with_video: string
-  posts_filtered_out: string
+interface Stats {
+  currentStats: {
+    total_posts_indexed: string
+    total_posts_received: string
+    posts_with_images: string
+    posts_with_video: string
+    posts_filtered_out: string
+    last_updated: string
+  } | null
+  postStats: {
+    total_posts: string
+    posts_with_images: string
+    posts_with_video: string
+    posts_with_links: string
+    unique_authors: string
+    oldest_post: string
+    newest_post: string
+  } | null
+  historicalStats: Array<{
+    id: number
+    total_posts_indexed: string
+    total_posts_received: string
+    posts_with_images: string
+    posts_with_video: string
+    posts_filtered_out: string
+    recorded_at: string
+  }>
+  recentPosts: Array<{
+    id: number
+    author_handle: string
+    text: string
+    created_at: string
+    has_images: boolean
+    has_video: boolean
+    has_external_link: boolean
+    external_domain: string | null
+  }>
+  trafficMetrics: Array<{
+    hour: string
+    posts_count: string
+  }>
+  retentionMetrics: {
+    active_posts: string
+    hourly_stats: string
+    daily_stats: string
+    oldest_active_post: string
+    oldest_hourly_stat: string
+    oldest_daily_stat: string
+  } | null
 }
 
 export function AdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState("")
-  const [stats, setStats] = useState<FeedStats | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [isCollectingManually, setIsCollectingManually] = useState(false)
-  const [lastCollectionResult, setLastCollectionResult] = useState<string>("")
-  const [chartData, setChartData] = useState<{
-    received: Array<{ time: string; value: number }>
-    indexed: Array<{ time: string; value: number }>
-  }>({
-    received: [],
-    indexed: [],
-  })
-  const [activeTab, setActiveTab] = useState<"overview" | "database">("overview")
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchStats()
-      fetchHistory()
-      const interval = setInterval(() => {
-        fetchStats()
-        fetchHistory()
-      }, 30000) // Update every 30 seconds
-      return () => clearInterval(interval)
-    }
-  }, [isAuthenticated])
+    fetchStats()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const fetchStats = async () => {
     try {
-      const response = await fetch("/api/firehose/stats")
-      if (response.ok) {
-        const data = await response.json()
-        const parsedStats: FeedStats = {
-          total_posts_received: Number(data.total_posts_received) || 0,
-          total_posts_indexed: Number(data.total_posts_indexed) || 0,
-          posts_with_images: Number(data.posts_with_images) || 0,
-          posts_with_video: Number(data.posts_with_video) || 0,
-          posts_filtered_out: Number(data.posts_filtered_out) || 0,
-          last_updated: data.last_updated,
-        }
-        setStats(parsedStats)
-      }
-    } catch (error) {
-      console.error("[v0] Error fetching stats:", error)
-    }
-  }
-
-  const fetchHistory = async () => {
-    try {
-      const response = await fetch("/api/firehose/history")
-      if (response.ok) {
-        const data = await response.json()
-        const history: HistoricalDataPoint[] = data.history || []
-
-        // Format data for charts
-        const receivedData = history.map((point) => ({
-          time: new Date(point.hour).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
-          value: Number(point.total_posts_received) || 0,
-        }))
-
-        const indexedData = history.map((point) => ({
-          time: new Date(point.hour).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
-          value: Number(point.total_posts_indexed) || 0,
-        }))
-
-        setChartData({
-          received: receivedData,
-          indexed: indexedData,
-        })
-      }
-    } catch (error) {
-      console.error("[v0] Error fetching history:", error)
-    }
-  }
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password) {
-      setIsAuthenticated(true)
-    }
-  }
-
-  const calculatePercentage = (numerator: number | undefined, denominator: number | undefined): number => {
-    if (!denominator || denominator === 0 || !numerator) {
-      return 0
-    }
-    return Math.round((numerator / denominator) * 100)
-  }
-
-  const handleManualCollection = async () => {
-    setIsCollectingManually(true)
-    setLastCollectionResult("")
-    try {
-      console.log("[v0] Starting manual collection...")
-      const response = await fetch("/api/cron/collect-posts", {
-        method: "GET", // explicitly set method
-        headers: {
-          Authorization: `Bearer ${password}`,
-        },
-      })
-
-      console.log("[v0] Response status:", response.status)
-      console.log("[v0] Response headers:", Object.fromEntries(response.headers.entries()))
-
-      const contentType = response.headers.get("content-type")
-      let result
-
-      if (contentType?.includes("application/json")) {
-        result = await response.json()
-      } else {
-        const text = await response.text()
-        console.error("[v0] Non-JSON response:", text)
-        setLastCollectionResult(`✗ Error: Server error (${response.status}). Check server logs.`)
-        return
-      }
-
-      console.log("[v0] Response data:", result)
-
-      if (response.ok) {
-        setLastCollectionResult(
-          `✓ Collected ${result.postsReceived} posts, indexed ${result.postsIndexed}, filtered ${result.postsFiltered}`,
-        )
-        // Refresh stats immediately
-        await fetchStats()
-        await fetchHistory()
-      } else {
-        const errorMsg = result.details ? `${result.error}: ${result.details}` : result.error || "Unknown error"
-        setLastCollectionResult(`✗ Error: ${errorMsg}`)
-      }
-    } catch (error) {
-      console.error("[v0] Manual collection error:", error)
-      setLastCollectionResult(`✗ Error: ${error instanceof Error ? error.message : String(error)}`)
+      const response = await fetch("/api/admin/stats")
+      if (!response.ok) throw new Error("Failed to fetch stats")
+      const data = await response.json()
+      setStats(data)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load statistics")
     } finally {
-      setIsCollectingManually(false)
+      setLoading(false)
     }
   }
 
-  const indexRate = calculatePercentage(stats?.total_posts_indexed, stats?.total_posts_received)
-  const filterRate = calculatePercentage(stats?.posts_filtered_out, stats?.total_posts_received)
-
-  const isCollecting = stats?.last_updated
-    ? Date.now() - new Date(stats.last_updated).getTime() < 120000 // Active if updated in last 2 minutes
-    : false
-
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md p-8 bg-card border-border">
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-foreground mb-2">Feed Generator Admin</h1>
-            <p className="text-sm text-muted-foreground">Enter admin password to continue</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-input border-border text-foreground"
-                placeholder="Enter admin password"
-              />
-            </div>
-            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              Login
-            </Button>
-          </form>
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner className="h-8 w-8" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-red-500">Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
         </Card>
       </div>
     )
   }
 
+  const currentStats = stats?.currentStats
+  const postStats = stats?.postStats
+  const retentionMetrics = stats?.retentionMetrics
+  const filterRate = currentStats
+    ? ((Number(currentStats.posts_filtered_out) / Number(currentStats.total_posts_received)) * 100).toFixed(1)
+    : "0"
+  const indexRate = currentStats
+    ? ((Number(currentStats.total_posts_indexed) / Number(currentStats.total_posts_received)) * 100).toFixed(1)
+    : "0"
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Feed Generator</h1>
-              <p className="text-sm text-muted-foreground">Bluesky Feed Monitoring</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-2 mr-4">
-                <Button
-                  onClick={() => setActiveTab("overview")}
-                  variant={activeTab === "overview" ? "default" : "outline"}
-                  size="sm"
-                >
-                  Overview
-                </Button>
-                <Button
-                  onClick={() => setActiveTab("database")}
-                  variant={activeTab === "database" ? "default" : "outline"}
-                  size="sm"
-                >
-                  Database
-                </Button>
-              </div>
-              <Button
-                onClick={handleManualCollection}
-                disabled={isCollectingManually}
-                size="sm"
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {isCollectingManually ? "Collecting..." : "Collect Now"}
-              </Button>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isCollecting ? "bg-chart-2" : "bg-muted"}`} />
-                <span className="text-sm text-muted-foreground">
-                  {isCollecting ? "Collecting" : "Waiting for next run"}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground bg-accent px-3 py-1.5 rounded-md">Cron: Every minute</div>
-            </div>
-          </div>
-          {lastCollectionResult && (
-            <div className="mt-3 text-xs text-muted-foreground bg-accent px-3 py-2 rounded-md">
-              {lastCollectionResult}
-            </div>
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Bluesky Feed Dashboard</h1>
+          <p className="text-muted-foreground">Monitor your feed statistics and traffic in real-time</p>
+          {currentStats && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Last updated: {new Date(currentStats.last_updated).toLocaleString()}
+            </p>
           )}
         </div>
-      </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {activeTab === "overview" ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <StatsCard title="Posts Received" value={stats?.total_posts_received || 0} icon={Activity} />
-              <StatsCard title="Posts Indexed" value={stats?.total_posts_indexed || 0} icon={Database} />
-              <StatsCard title="With Images" value={stats?.posts_with_images || 0} icon={ImageIcon} />
-              <StatsCard title="Filtered Out" value={stats?.posts_filtered_out || 0} icon={Filter} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <MetricChart
-                title="Posts Received"
-                description="Total posts from firehose over last 24 hours"
-                data={chartData.received.length > 0 ? chartData.received : [{ time: "Now", value: 0 }]}
-                color="hsl(var(--chart-1))"
-              />
-              <MetricChart
-                title="Posts Indexed"
-                description="Successfully indexed posts over last 24 hours"
-                data={chartData.indexed.length > 0 ? chartData.indexed : [{ time: "Now", value: 0 }]}
-                color="hsl(var(--chart-2))"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="p-6 bg-card border-border">
-                <div className="flex items-center gap-3 mb-4">
-                  <ImageIcon className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground">Media Content</h3>
-                    <p className="text-xs text-muted-foreground">Posts with images and video</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Images</span>
-                    <span className="text-lg font-semibold text-foreground">{stats?.posts_with_images || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Videos</span>
-                    <span className="text-lg font-semibold text-foreground">{stats?.posts_with_video || 0}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-card border-border">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground">Feed Health</h3>
-                    <p className="text-xs text-muted-foreground">System performance metrics</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Index Rate</span>
-                    <span className="text-lg font-semibold text-chart-2">{indexRate}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Filter Rate</span>
-                    <span className="text-lg font-semibold text-chart-3">{filterRate}%</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </>
-        ) : (
-          <DatabaseManagement password={password} />
+        {/* Warning Banner if retention tables don't exist */}
+        {!retentionMetrics && (
+          <Card className="border-yellow-500/50 bg-yellow-500/10">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+                <AlertCircle className="h-5 w-5" />
+                Data Retention Not Configured
+              </CardTitle>
+              <CardDescription>
+                Run the SQL script in{" "}
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded">scripts/create_retention_tables.sql</code> to
+                enable the data retention strategy. Then visit{" "}
+                <a href="/admin/retention" className="underline hover:text-primary">
+                  /admin/retention
+                </a>{" "}
+                to manage your data lifecycle.
+              </CardDescription>
+            </CardHeader>
+          </Card>
         )}
-      </main>
+
+        {/* Key Metrics */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Posts Received</CardTitle>
+              <Database className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{currentStats?.total_posts_received?.toLocaleString() || "0"}</div>
+              <p className="text-xs text-muted-foreground">
+                {currentStats?.total_posts_indexed?.toLocaleString() || "0"} indexed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Index Rate</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{indexRate}%</div>
+              <p className="text-xs text-muted-foreground">
+                {currentStats?.posts_filtered_out?.toLocaleString() || "0"} filtered out
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Unique Authors</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{postStats?.unique_authors?.toLocaleString() || "0"}</div>
+              <p className="text-xs text-muted-foreground">
+                {postStats?.total_posts?.toLocaleString() || "0"} total posts
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Media Posts</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-lg font-bold">{currentStats?.posts_with_images?.toLocaleString() || "0"}</div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ImageIcon className="h-3 w-3" /> Images
+                  </p>
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{currentStats?.posts_with_video?.toLocaleString() || "0"}</div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Video className="h-3 w-3" /> Videos
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Data Retention Metrics */}
+        {retentionMetrics && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HardDrive className="h-5 w-5" />
+                Data Retention Strategy
+              </CardTitle>
+              <CardDescription>Multi-tier storage efficiency metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Hot Storage (7 days)</div>
+                  <div className="text-2xl font-bold">{Number(retentionMetrics.active_posts).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Detailed posts since{" "}
+                    {retentionMetrics.oldest_active_post
+                      ? new Date(retentionMetrics.oldest_active_post).toLocaleDateString()
+                      : "N/A"}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Warm Storage (30 days)</div>
+                  <div className="text-2xl font-bold">{Number(retentionMetrics.hourly_stats).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Hourly aggregates since{" "}
+                    {retentionMetrics.oldest_hourly_stat
+                      ? new Date(retentionMetrics.oldest_hourly_stat).toLocaleDateString()
+                      : "N/A"}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Cold Storage (Forever)</div>
+                  <div className="text-2xl font-bold">{Number(retentionMetrics.daily_stats).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Daily summaries since{" "}
+                    {retentionMetrics.oldest_daily_stat
+                      ? new Date(retentionMetrics.oldest_daily_stat).toLocaleDateString()
+                      : "N/A"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-muted rounded-lg">
+                <p className="text-sm">
+                  <span className="font-medium">Storage Strategy:</span> Detailed posts kept for 7 days, then aggregated
+                  to hourly stats for 30 days, then archived as daily summaries indefinitely. This provides full
+                  analytics with ~90% storage reduction.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Traffic Metrics */}
+        <Card>
+          <CardHeader>
+            <CardTitle>24-Hour Traffic</CardTitle>
+            <CardDescription>Posts indexed per hour</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.trafficMetrics && stats.trafficMetrics.length > 0 ? (
+              <div className="space-y-2">
+                {stats.trafficMetrics.map((metric) => (
+                  <div key={metric.hour} className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{new Date(metric.hour).toLocaleTimeString()}</span>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 bg-primary rounded-full"
+                        style={{ width: `${Math.min(Number(metric.posts_count) / 10, 100)}px` }}
+                      />
+                      <span className="text-sm font-medium">{metric.posts_count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No traffic data in the last 24 hours</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Historical Trends */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Historical Statistics</CardTitle>
+            <CardDescription>Recent snapshots from feed_stats_history</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.historicalStats && stats.historicalStats.length > 0 ? (
+              <div className="space-y-4">
+                {stats.historicalStats.slice(0, 10).map((stat) => (
+                  <div key={stat.id} className="border-b pb-3 last:border-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{new Date(stat.recorded_at).toLocaleString()}</span>
+                      <Badge variant="outline">
+                        {((Number(stat.total_posts_indexed) / Number(stat.total_posts_received)) * 100).toFixed(1)}%
+                        indexed
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+                      <div>Received: {stat.total_posts_received?.toLocaleString()}</div>
+                      <div>Indexed: {stat.total_posts_indexed?.toLocaleString()}</div>
+                      <div>Images: {stat.posts_with_images?.toLocaleString()}</div>
+                      <div>Videos: {stat.posts_with_video?.toLocaleString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No historical data available</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Posts */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Posts</CardTitle>
+            <CardDescription>Latest 10 posts indexed</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.recentPosts && stats.recentPosts.length > 0 ? (
+              <div className="space-y-4">
+                {stats.recentPosts.map((post) => (
+                  <div key={post.id} className="border-b pb-3 last:border-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-medium text-sm">@{post.author_handle}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(post.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{post.text}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {post.has_images && (
+                        <Badge variant="secondary" className="text-xs">
+                          <ImageIcon className="h-3 w-3 mr-1" /> Images
+                        </Badge>
+                      )}
+                      {post.has_video && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Video className="h-3 w-3 mr-1" /> Video
+                        </Badge>
+                      )}
+                      {post.has_external_link && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Link className="h-3 w-3 mr-1" /> {post.external_domain || "Link"}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No recent posts available</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
