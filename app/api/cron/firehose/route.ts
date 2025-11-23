@@ -81,14 +81,18 @@ interface BlueskyPost {
 }
 
 export async function GET(request: NextRequest) {
+  console.log("[v0] Firehose cron started")
+
   try {
     // Verify cron secret
     const authHeader = request.headers.get("authorization")
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      console.log("[v0] Unauthorized attempt - Invalid or missing token")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+    console.log("[v0] Authentication successful")
 
     console.log("[v0] Firehose: Starting fetch cycle")
 
@@ -99,25 +103,29 @@ export async function GET(request: NextRequest) {
     let postsIndexed = 0
     let postsFiltered = 0
 
+    console.log(`[v0] Running ${searchQueries.length} search queries`)
+
     for (const query of searchQueries) {
       try {
-        const response = await fetch(
-          `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=100`,
-          {
-            headers: {
-              Accept: "application/json",
-            },
-            signal: AbortSignal.timeout(15000),
+        const searchUrl = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=100`
+        console.log(`[v0] Fetching from Bluesky: ${searchUrl}`)
+
+        const response = await fetch(searchUrl, {
+          headers: {
+            Accept: "application/json",
           },
-        )
+          signal: AbortSignal.timeout(15000),
+        })
 
         if (!response.ok) {
-          console.error(`[v0] Bluesky API error for query "${query}": ${response.status}`)
+          const errorText = await response.text().catch(() => "No error body")
+          console.error(`[v0] Bluesky API error for query "${query}": ${response.status} - ${errorText}`)
           continue
         }
 
         const data = await response.json()
         const posts = data.posts || []
+        console.log(`[v0] Query "${query}" returned ${posts.length} posts`)
 
         for (const post of posts) {
           postsReceived++
@@ -206,6 +214,7 @@ export async function GET(request: NextRequest) {
 
     if (postsIndexed > 0) {
       try {
+        console.log("[v0] Updating hashtag stats...")
         await sql`SELECT bluesky_feed.update_hashtag_stats()`
       } catch (hashtagError) {
         console.error("[v0] Error updating hashtag stats:", hashtagError)
@@ -213,6 +222,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[v0] Firehose: Processed ${postsReceived} posts, indexed ${postsIndexed}, filtered ${postsFiltered}`)
+    console.log("[v0] Firehose run completed successfully")
 
     return NextResponse.json({
       success: true,
