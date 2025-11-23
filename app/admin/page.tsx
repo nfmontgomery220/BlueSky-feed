@@ -1,4 +1,5 @@
 import { AdminDashboard } from "@/components/admin-dashboard"
+import { AdminNav } from "@/components/admin-nav"
 import { redirect } from "next/navigation"
 
 export default async function AdminPage() {
@@ -8,5 +9,10 @@ export default async function AdminPage() {
     redirect("/admin/login")
   }
 
-  return <AdminDashboard />
+  return (
+    <>
+      <AdminNav />
+      <AdminDashboard />
+    </>
+  )
 }

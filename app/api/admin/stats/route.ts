@@ -11,6 +11,19 @@ export async function GET() {
       LIMIT 1
     `
 
+    const firehoseStatus = await sql`
+      SELECT 
+        last_updated,
+        CASE 
+          WHEN last_updated > NOW() - INTERVAL '5 minutes' THEN 'active'
+          WHEN last_updated > NOW() - INTERVAL '1 hour' THEN 'degraded'
+          ELSE 'inactive'
+        END as status
+      FROM bluesky_feed.feed_stats
+      ORDER BY last_updated DESC
+      LIMIT 1
+    `
+
     const postStats = await sql`
       SELECT 
         COUNT(*) as total_posts,
@@ -81,6 +94,7 @@ export async function GET() {
 
     return NextResponse.json({
       currentStats: currentStats[0] || null,
+      firehoseStatus: firehoseStatus[0] || null,
       postStats: postStats[0] || null,
       historicalStats: historicalStats || [],
       recentPosts: recentPosts || [],

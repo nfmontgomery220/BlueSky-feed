@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/retention",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/hashtags",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/firehose",
+      "schedule": "* * * * *"
     }
   ]
 }
