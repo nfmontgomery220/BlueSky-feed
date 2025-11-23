@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
 
     for (const query of searchQueries) {
       try {
-        const searchUrl = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=100`
+        const searchUrl = `https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=100`
         console.log(`[v0] Fetching from Bluesky: ${searchUrl}`)
 
         const headers: Record<string, string> = {
