@@ -4,9 +4,6 @@ import { generateObject } from "ai"
 import { z } from "zod"
 import { openai } from "@ai-sdk/openai"
 
-// Initialize Neon client
-const sql = neon(process.env.DATABASE_URL!)
-
 // Define the classification schema
 const ClassificationSchema = z.object({
   category: z.enum([
@@ -24,6 +21,13 @@ const ClassificationSchema = z.object({
 })
 
 export async function GET(request: Request) {
+  const connectionString = process.env.DATABASE_URL || process.env.bfc_DATABASE_URL
+  if (!connectionString) {
+    console.error("Missing DATABASE_URL")
+    return new Response("Server Configuration Error", { status: 500 })
+  }
+  const sql = neon(connectionString)
+
   // Verify Cron Secret
   const authHeader = request.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

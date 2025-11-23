@@ -1,8 +1,6 @@
 import { neon } from "@neondatabase/serverless"
 import { type NextRequest, NextResponse } from "next/server"
 
-const sql = neon(process.env.bfc_DATABASE_URL || "")
-
 // Civic keywords for filtering (maintaining ~1.5% index rate)
 const CIVIC_KEYWORDS = [
   // Government & Politics
@@ -111,6 +109,13 @@ async function createSession() {
 
 export async function GET(request: NextRequest) {
   console.log("[v0] Firehose cron started")
+
+  const connectionString = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
+  if (!connectionString) {
+    console.error("[v0] Missing DATABASE_URL")
+    return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 })
+  }
+  const sql = neon(connectionString)
 
   try {
     // Verify cron secret
