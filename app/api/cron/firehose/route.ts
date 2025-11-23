@@ -81,11 +81,11 @@ interface BlueskyPost {
 }
 
 async function createSession() {
-  const identifier = process.env.BLUESKY_IDENTIFIER
-  const password = process.env.BLUESKY_PASSWORD
+  const identifier = process.env.BLUESKY_IDENTIFIER || process.env.Bluesky_Identifier
+  const password = process.env.BLUESKY_PASSWORD || process.env.Bluesky_Password
 
   if (!identifier || !password) {
-    console.error("[v0] Missing Bluesky credentials (BLUESKY_IDENTIFIER, BLUESKY_PASSWORD)")
+    console.error("[v0] Missing Bluesky credentials (BLUESKY_IDENTIFIER, BLUESKY_PASSWORD or mixed case)")
     return null
   }
 

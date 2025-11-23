@@ -13,14 +13,14 @@ export async function testBlueskyConnection() {
   try {
     log("Starting connection test...")
 
-    // 1. Check Environment Variables
-    const identifier = process.env.BLUESKY_IDENTIFIER
-    const password = process.env.BLUESKY_PASSWORD
+    // 1. Check Environment Variables (supporting both cases)
+    const identifier = process.env.BLUESKY_IDENTIFIER || process.env.Bluesky_Identifier
+    const password = process.env.BLUESKY_PASSWORD || process.env.Bluesky_Password
 
-    if (!identifier) log("❌ Missing BLUESKY_IDENTIFIER env var")
+    if (!identifier) log("❌ Missing BLUESKY_IDENTIFIER (or Bluesky_Identifier) env var")
     else log(`✅ BLUESKY_IDENTIFIER found: ${identifier}`)
 
-    if (!password) log("❌ Missing BLUESKY_PASSWORD env var")
+    if (!password) log("❌ Missing BLUESKY_PASSWORD (or Bluesky_Password) env var")
     else log(`✅ BLUESKY_PASSWORD found (length: ${password.length})`)
 
     if (!identifier || !password) {
