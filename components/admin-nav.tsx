@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Hash, Database, Terminal } from "lucide-react"
+import { BarChart3, Hash, Database, Terminal, PieChart } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function AdminNav() {
@@ -13,6 +13,11 @@ export function AdminNav() {
       href: "/admin",
       label: "Dashboard",
       icon: BarChart3,
+    },
+    {
+      href: "/admin/analysis",
+      label: "Analysis",
+      icon: PieChart,
     },
     {
       href: "/admin/hashtags",
