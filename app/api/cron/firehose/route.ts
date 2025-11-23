@@ -80,6 +80,35 @@ interface BlueskyPost {
   }
 }
 
+async function createSession() {
+  const identifier = process.env.BLUESKY_IDENTIFIER
+  const password = process.env.BLUESKY_PASSWORD
+
+  if (!identifier || !password) {
+    console.error("[v0] Missing Bluesky credentials (BLUESKY_IDENTIFIER, BLUESKY_PASSWORD)")
+    return null
+  }
+
+  try {
+    const response = await fetch("https://bsky.social/xrpc/com.atproto.server.createSession", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password }),
+    })
+
+    if (!response.ok) {
+      console.error(`[v0] Bluesky auth failed: ${response.status} - ${await response.text()}`)
+      return null
+    }
+
+    const data = await response.json()
+    return data.accessJwt
+  } catch (error) {
+    console.error("[v0] Bluesky auth error:", error)
+    return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   console.log("[v0] Firehose cron started")
 
@@ -93,6 +122,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     console.log("[v0] Authentication successful")
+
+    const accessJwt = await createSession()
+    if (!accessJwt) {
+      console.log("[v0] Proceeding without auth (public API limits apply)")
+    } else {
+      console.log("[v0] Bluesky authenticated successfully")
+    }
 
     console.log("[v0] Firehose: Starting fetch cycle")
 
@@ -110,10 +146,15 @@ export async function GET(request: NextRequest) {
         const searchUrl = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=100`
         console.log(`[v0] Fetching from Bluesky: ${searchUrl}`)
 
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+        }
+        if (accessJwt) {
+          headers["Authorization"] = `Bearer ${accessJwt}`
+        }
+
         const response = await fetch(searchUrl, {
-          headers: {
-            Accept: "application/json",
-          },
+          headers,
           signal: AbortSignal.timeout(15000),
         })
 
