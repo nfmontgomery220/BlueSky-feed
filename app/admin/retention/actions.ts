@@ -2,44 +2,42 @@
 
 import { neon } from "@neondatabase/serverless"
 
-const sql = neon(process.env.bfc_DATABASE_URL!)
-
 export async function runRetentionJobAction() {
   try {
-    console.log("[v0] Starting data retention job")
+    const dbUrl = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
+    if (!dbUrl) {
+      return {
+        success: false,
+        error: "Database not configured",
+        timestamp: new Date().toISOString(),
+        hoursAggregated: 0,
+        daysAggregated: 0,
+        postsDeleted: 0,
+        hourlyStatsDeleted: 0,
+      }
+    }
+    const sql = neon(dbUrl)
 
     // Step 1: Aggregate posts older than 7 days to hourly stats
-    console.log("[v0] Aggregating posts to hourly stats...")
+    // (this also deletes the aggregated posts)
     const hourlyResult = await sql`SELECT * FROM bluesky_feed.aggregate_to_hourly()`
-    console.log(`[v0] Aggregated ${hourlyResult[0]?.hours_processed || 0} hours`)
+    const hoursAggregated = hourlyResult[0]?.aggregated_count || 0
+    const postsDeleted = hourlyResult[0]?.deleted_count || 0
 
     // Step 2: Aggregate hourly stats older than 30 days to daily stats
-    console.log("[v0] Aggregating hourly to daily stats...")
+    // (this also deletes the aggregated hourly stats)
     const dailyResult = await sql`SELECT * FROM bluesky_feed.aggregate_to_daily()`
-    console.log(`[v0] Aggregated ${dailyResult[0]?.days_processed || 0} days`)
-
-    // Step 3: Clean up old data
-    console.log("[v0] Cleaning up old data...")
-    const cleanupResult = await sql`SELECT * FROM bluesky_feed.cleanup_old_data()`
-    const postsDeleted = cleanupResult[0]?.posts_deleted || 0
-    const hourlyDeleted = cleanupResult[0]?.hourly_deleted || 0
-    console.log(`[v0] Deleted ${postsDeleted} posts and ${hourlyDeleted} hourly stats`)
-
-    // Step 4: Vacuum analyze to reclaim space
-    console.log("[v0] Running VACUUM ANALYZE...")
-    await sql`VACUUM ANALYZE bluesky_feed.posts`
-    await sql`VACUUM ANALYZE bluesky_feed.feed_stats_hourly`
+    const daysAggregated = dailyResult[0]?.aggregated_count || 0
 
     const summary = {
       success: true,
       timestamp: new Date().toISOString(),
-      hoursAggregated: hourlyResult[0]?.hours_processed || 0,
-      daysAggregated: dailyResult[0]?.days_processed || 0,
+      hoursAggregated,
+      daysAggregated,
       postsDeleted,
-      hourlyStatsDeleted: hourlyDeleted,
+      hourlyStatsDeleted: 0,
     }
 
-    console.log("[v0] Data retention job completed", summary)
     return summary
   } catch (error) {
     console.error("[v0] Error in retention job:", error)
