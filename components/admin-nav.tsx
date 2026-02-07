@@ -2,13 +2,18 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Hash, Database, Terminal, PieChart } from "lucide-react"
+import { BarChart3, Hash, Database, Terminal, PieChart, Home } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function AdminNav() {
   const pathname = usePathname()
 
   const links = [
+    {
+      href: "/",
+      label: "Home",
+      icon: Home,
+    },
     {
       href: "/admin",
       label: "Dashboard",
