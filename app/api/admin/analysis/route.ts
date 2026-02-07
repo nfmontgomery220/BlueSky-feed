@@ -5,11 +5,12 @@ export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    if (!process.env.DATABASE_URL) {
+    const dbUrl = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
+    if (!dbUrl) {
       return NextResponse.json({ error: "Database not configured" }, { status: 500 })
     }
 
-    const sql = neon(process.env.DATABASE_URL)
+    const sql = neon(dbUrl)
 
     // Check if tables exist first
     try {
