@@ -21,7 +21,7 @@ const ClassificationSchema = z.object({
 })
 
 export async function GET(request: Request) {
-  const connectionString = process.env.DATABASE_URL || process.env.bfc_DATABASE_URL
+  const connectionString = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
   if (!connectionString) {
     console.error("Missing DATABASE_URL")
     return new Response("Server Configuration Error", { status: 500 })
@@ -82,9 +82,9 @@ export async function GET(request: Request) {
         // 3. Save result
         await sql`
           INSERT INTO bluesky_feed.post_analysis 
-          (post_uri, category, sentiment, confidence, model_used)
+          (post_uri, category, sentiment, confidence, model_version)
           VALUES 
-          (${post.uri}, ${object.category}, ${object.sentiment}, ${object.confidence}, 'gpt-4o-mini')
+          (${post.uri}, ${object.category}, ${object.sentiment}, ${object.confidence}, 'v1.0')
           ON CONFLICT (post_uri) DO NOTHING
         `
 
