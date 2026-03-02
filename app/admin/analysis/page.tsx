@@ -125,6 +125,7 @@ export default function AnalysisPage() {
             </CardContent>
           </Card>
         ) : (
+        <>
         <div className="grid gap-8 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -223,9 +224,9 @@ export default function AnalysisPage() {
                 </div>
               ))}
             </div>
-</CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
+        </>
         )}
       </div>
     </>
