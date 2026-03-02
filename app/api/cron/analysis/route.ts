@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
-import { generateObject } from "ai"
+import { generateText, Output } from "ai"
 import { z } from "zod"
-import { openai } from "@ai-sdk/openai"
 
-// Define the classification schema
+// Define the classification schema using nullable() for OpenAI strict mode compatibility
 const ClassificationSchema = z.object({
   category: z.enum([
     "Social Security",
@@ -52,13 +51,18 @@ export async function GET(request: Request) {
 
     const results = []
 
-    // 2. Analyze each post
+    // 2. Analyze each post using AI SDK 6 with Vercel AI Gateway
     for (const post of postsToAnalyze) {
       try {
-        const { object } = await generateObject({
-          model: openai("gpt-4o-mini"),
-          schema: ClassificationSchema,
-          system: `You are a policy analyst coding social media posts about the US Federal Budget.
+        const { output } = await generateText({
+          model: "openai/gpt-4o-mini", // Uses Vercel AI Gateway - no provider import needed
+          output: Output.object({
+            schema: ClassificationSchema,
+          }),
+          messages: [
+            {
+              role: "system",
+              content: `You are a policy analyst coding social media posts about the US Federal Budget.
           
           Apply this WATERFALL LOGIC strictly in order:
           
@@ -76,8 +80,20 @@ export async function GET(request: Request) {
              - Revenue & Taxes: IRS, tax rates, tax cuts, tariffs.
              
           If a post mentions multiple topics, pick the PRIMARY driver of the argument.`,
-          prompt: `Analyze this post: "${post.text}"`,
+            },
+            {
+              role: "user",
+              content: `Analyze this post: "${post.text}"`,
+            },
+          ],
         })
+        
+        if (!output) {
+          console.error(`No output received for post ${post.uri}`)
+          continue
+        }
+        
+        const object = output
 
         // 3. Save result
         await sql`
