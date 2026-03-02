@@ -1,9 +1,37 @@
--- Fix aggregate_to_hourly function to match actual table schema
--- The function was referencing wrong column names
-
--- First, let's check the actual columns in each table to ensure we fix correctly:
--- feed_stats_hourly has: id, hour, posts_count, unique_authors, posts_with_images, posts_with_video, posts_with_links, top_domains, created_at
--- posts has: has_images, has_video, has_external_link (not has_media, has_links)
+-- ============================================================
+-- DATABASE FUNCTION FIX SCRIPT
+-- ============================================================
+-- This script fixes the aggregate_to_hourly and aggregate_to_daily 
+-- functions to match the actual table schemas.
+--
+-- VERIFIED TABLE SCHEMAS:
+-- 
+-- posts table columns:
+--   - id, uri, cid, author_did, author_handle, text
+--   - created_at (timestamp with time zone, NOT NULL)
+--   - indexed_at (timestamp with time zone, NULLABLE)
+--   - has_images, has_video, has_external_link (boolean)
+--   - external_domain, relevance_score, embed_data, facets, labels, langs, hashtags
+--
+-- feed_stats_hourly table columns:
+--   - id, hour (timestamp without time zone, NOT NULL)
+--   - posts_count, unique_authors, posts_with_images, posts_with_video, posts_with_links
+--   - top_domains (ARRAY), created_at
+--
+-- feed_stats_daily table columns:
+--   - id, date (date, NOT NULL)
+--   - posts_count, unique_authors, posts_with_images, posts_with_video, posts_with_links
+--   - top_authors, top_domains (ARRAY), created_at
+--
+-- ISSUES FOUND IN aggregate_to_hourly:
+--   1. Uses 'hour_bucket' but table has 'hour'
+--   2. Uses 'total_posts' but table has 'posts_count'
+--   3. Uses 'posts_with_media' but table has 'posts_with_images'
+--   4. Uses 'has_media' but posts has 'has_images'
+--   5. Uses 'has_links' but posts has 'has_external_link'
+--   6. References non-existent 'avg_index_delay_seconds' and 'updated_at'
+--   7. top_domains should be text[] ARRAY not jsonb
+-- ============================================================
 
 -- Drop and recreate aggregate_to_hourly with correct column names
 CREATE OR REPLACE FUNCTION bluesky_feed.aggregate_to_hourly()
