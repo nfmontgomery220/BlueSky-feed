@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Database, Users, ImageIcon, Video, Link, TrendingUp, HardDrive, AlertCircle } from "lucide-react"
+import { Activity, Database, Users, ImageIcon, Video, Link, TrendingUp, HardDrive, AlertCircle, Download, Hash, Settings } from "lucide-react"
+import NextLink from "next/link"
 
 interface Stats {
   currentStats: {
@@ -118,14 +119,42 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bluesky Feed Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your feed statistics and traffic in real-time</p>
-          {currentStats && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Last updated: {new Date(currentStats.last_updated).toLocaleString()}
-            </p>
-          )}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Bluesky Feed Dashboard</h1>
+            <p className="text-muted-foreground">Monitor your feed statistics and traffic in real-time</p>
+            {currentStats && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Last updated: {new Date(currentStats.last_updated).toLocaleString()}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <NextLink href="/admin/export">
+              <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export Data
+              </Badge>
+            </NextLink>
+            <NextLink href="/admin/hashtags">
+              <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
+                <Hash className="h-3.5 w-3.5 mr-1.5" />
+                Hashtags
+              </Badge>
+            </NextLink>
+            <NextLink href="/admin/retention">
+              <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
+                <HardDrive className="h-3.5 w-3.5 mr-1.5" />
+                Retention
+              </Badge>
+            </NextLink>
+            <NextLink href="/admin/db-assessment">
+              <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
+                <Settings className="h-3.5 w-3.5 mr-1.5" />
+                DB Assessment
+              </Badge>
+            </NextLink>
+          </div>
         </div>
 
         {/* Warning Banner if retention tables don't exist */}
