@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Database, Users, ImageIcon, Video, Link, TrendingUp, HardDrive, AlertCircle, Download, Hash, Settings } from "lucide-react"
+import { Activity, Database, Users, ImageIcon, Video, Link, TrendingUp, HardDrive, AlertCircle, Download, Hash, Settings, Target } from "lucide-react"
 import NextLink from "next/link"
 
 interface Stats {
@@ -146,6 +146,12 @@ export function AdminDashboard() {
               <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
                 <HardDrive className="h-3.5 w-3.5 mr-1.5" />
                 Retention
+              </Badge>
+            </NextLink>
+            <NextLink href="/admin/relevance">
+              <Badge variant="outline" className="cursor-pointer hover:bg-accent px-3 py-1.5">
+                <Target className="h-3.5 w-3.5 mr-1.5" />
+                Relevance
               </Badge>
             </NextLink>
             <NextLink href="/admin/db-assessment">
