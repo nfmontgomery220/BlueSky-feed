@@ -3,8 +3,6 @@ import { neon } from "@neondatabase/serverless"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
-const sql = neon(process.env.DATABASE_URL!)
-
 // Classification schema matching the cron job
 const ClassificationSchema = z.object({
   category: z.enum([
@@ -23,6 +21,8 @@ const ClassificationSchema = z.object({
 
 export async function POST() {
   try {
+    const sql = neon(process.env.DATABASE_URL!)
+    
     // Get unanalyzed posts (limit to 20 for manual runs)
     const postsToAnalyze = await sql`
       SELECT p.uri, p.text, p.author_handle
