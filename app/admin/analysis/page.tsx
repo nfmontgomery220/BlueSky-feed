@@ -66,6 +66,8 @@ export default function AnalysisPage() {
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ffc658"]
 
+  const hasData = stats && stats.total_analyzed > 0
+
   return (
     <>
       <AdminNav />
@@ -93,6 +95,36 @@ export default function AnalysisPage() {
           </Card>
         </div>
 
+        {!hasData ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="rounded-full bg-muted p-4 mb-4">
+                <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No Analysis Data Yet</h3>
+              <p className="text-muted-foreground max-w-md mb-6">
+                The post_analysis table is empty. To populate analysis data, you can run AI categorization 
+                on collected posts using sentiment analysis and topic classification.
+              </p>
+              <div className="bg-muted/50 rounded-lg p-4 text-left max-w-lg w-full">
+                <p className="text-sm font-medium mb-2">To get started:</p>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>Ensure posts are being collected via the firehose</li>
+                  <li>Set up an AI analysis pipeline (e.g., using OpenAI API)</li>
+                  <li>Insert results into bluesky_feed.post_analysis table</li>
+                </ol>
+                <div className="mt-4 p-3 bg-background rounded border text-xs font-mono">
+                  <span className="text-muted-foreground">-- Example insert:</span><br/>
+                  INSERT INTO bluesky_feed.post_analysis<br/>
+                  (post_uri, category, sentiment, confidence)<br/>
+                  VALUES (&apos;at://...&apos;, &apos;budget&apos;, &apos;positive&apos;, 0.85);
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid gap-8 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -191,8 +223,10 @@ export default function AnalysisPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+</CardContent>
+          </Card>
+        </div>
+        )}
       </div>
     </>
   )
