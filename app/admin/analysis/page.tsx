@@ -26,6 +26,8 @@ export default function AnalysisPage() {
   const [stats, setStats] = useState<AnalysisStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeResult, setAnalyzeResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const fetchStats = async () => {
     setLoading(true)
@@ -40,6 +42,23 @@ export default function AnalysisPage() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const runAnalysis = async () => {
+    setAnalyzing(true)
+    setAnalyzeResult(null)
+    try {
+      const res = await fetch("/api/admin/analyze", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Analysis failed")
+      setAnalyzeResult({ success: true, message: `Analyzed ${data.analyzed} posts successfully` })
+      // Refresh stats after analysis
+      await fetchStats()
+    } catch (err) {
+      setAnalyzeResult({ success: false, message: err instanceof Error ? err.message : "Analysis failed" })
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -77,10 +96,32 @@ export default function AnalysisPage() {
             <h1 className="text-3xl font-bold tracking-tight">Conversation Analysis</h1>
             <p className="text-muted-foreground">AI-powered categorization and sentiment tracking for #budgetbuilder</p>
           </div>
-          <Button onClick={fetchStats} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {analyzeResult && (
+              <span className={`text-sm ${analyzeResult.success ? "text-green-600" : "text-red-600"}`}>
+                {analyzeResult.message}
+              </span>
+            )}
+            <Button onClick={runAnalysis} disabled={analyzing} size="sm">
+              {analyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Analyze Now
+                </>
+              )}
+            </Button>
+            <Button onClick={fetchStats} variant="outline" size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

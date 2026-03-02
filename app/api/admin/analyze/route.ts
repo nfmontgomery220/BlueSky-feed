@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
-// Define the classification schema using nullable() for OpenAI strict mode compatibility
+// Classification schema matching the cron job
 const ClassificationSchema = z.object({
   category: z.enum([
     "Social Security",
@@ -19,43 +19,36 @@ const ClassificationSchema = z.object({
   reasoning: z.string(),
 })
 
-export async function GET(request: Request) {
-  const connectionString = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
-  if (!connectionString) {
-    console.error("Missing DATABASE_URL")
-    return new Response("Server Configuration Error", { status: 500 })
-  }
-  const sql = neon(connectionString)
-
-  // Verify Cron Secret
-  const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 })
-  }
-
+export async function POST() {
   try {
-    // 1. Fetch unanalyzed posts (batch of 10 to respect rate limits/timeouts)
-    // We join with the analysis table to find posts that DON'T have an entry yet
+    const sql = neon(process.env.DATABASE_URL!)
+    
+    // Get unanalyzed posts (limit to 20 for manual runs)
     const postsToAnalyze = await sql`
-      SELECT p.uri, p.text 
+      SELECT p.uri, p.text, p.author_handle
       FROM bluesky_feed.posts p
-      LEFT JOIN bluesky_feed.post_analysis a ON p.uri = a.post_uri
-      WHERE a.id IS NULL
-      AND p.text IS NOT NULL
-      LIMIT 10
+      LEFT JOIN bluesky_feed.post_analysis pa ON p.uri = pa.post_uri
+      WHERE pa.post_uri IS NULL
+        AND p.text IS NOT NULL
+        AND LENGTH(p.text) > 20
+      ORDER BY p.indexed_at DESC
+      LIMIT 20
     `
 
     if (postsToAnalyze.length === 0) {
-      return NextResponse.json({ message: "No posts to analyze" })
+      return NextResponse.json({ 
+        analyzed: 0, 
+        message: "No unanalyzed posts found" 
+      })
     }
 
-    const results = []
+    let analyzedCount = 0
+    const errors: string[] = []
 
-    // 2. Analyze each post using AI SDK 6 with Vercel AI Gateway
     for (const post of postsToAnalyze) {
       try {
         const { output } = await generateText({
-          model: "openai/gpt-4o-mini", // Uses Vercel AI Gateway - no provider import needed
+          model: "openai/gpt-4o-mini",
           output: Output.object({
             schema: ClassificationSchema,
           }),
@@ -87,35 +80,56 @@ export async function GET(request: Request) {
             },
           ],
         })
-        
+
         if (!output) {
-          console.error(`No output received for post ${post.uri}`)
+          errors.push(`No output for post: ${post.uri.slice(-20)}`)
           continue
         }
-        
-        const object = output
 
-        // 3. Save result
+        // Save to post_analysis table
         await sql`
-          INSERT INTO bluesky_feed.post_analysis 
-          (post_uri, category, sentiment, confidence, model_version)
-          VALUES 
-          (${post.uri}, ${object.category}, ${object.sentiment}, ${object.confidence}, 'v1.0')
-          ON CONFLICT (post_uri) DO NOTHING
+          INSERT INTO bluesky_feed.post_analysis (
+            post_uri, 
+            category, 
+            sentiment, 
+            confidence, 
+            text,
+            analyzed_at
+          )
+          VALUES (
+            ${post.uri},
+            ${output.category},
+            ${output.sentiment},
+            ${output.confidence},
+            ${post.text},
+            NOW()
+          )
+          ON CONFLICT (post_uri) DO UPDATE SET
+            category = EXCLUDED.category,
+            sentiment = EXCLUDED.sentiment,
+            confidence = EXCLUDED.confidence,
+            analyzed_at = NOW()
         `
-
-        results.push({ uri: post.uri, category: object.category })
-      } catch (err) {
-        console.error(`Failed to analyze post ${post.uri}:`, err)
+        
+        analyzedCount++
+      } catch (postError) {
+        const errorMsg = postError instanceof Error ? postError.message : "Unknown error"
+        errors.push(`Error analyzing post: ${errorMsg}`)
       }
     }
 
     return NextResponse.json({
-      processed: results.length,
-      details: results,
+      analyzed: analyzedCount,
+      total: postsToAnalyze.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Analyzed ${analyzedCount} of ${postsToAnalyze.length} posts`
     })
+
   } catch (error) {
-    console.error("Analysis job failed:", error)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    console.error("Analysis error:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Analysis failed" },
+      { status: 500 }
+    )
   }
 }
