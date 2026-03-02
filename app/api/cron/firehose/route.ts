@@ -203,11 +203,25 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Calculate relevance score
-          const relevanceScore = Math.min(text.length / 280, 1.0)
-
           const hashtagMatches = post.record.text.match(/#(\w+)/g) || []
           const hashtags = hashtagMatches.map((tag: string) => tag.substring(1).toLowerCase())
+
+          // Calculate relevance score using the database function
+          let relevanceScore = 0.1 // default minimum
+          try {
+            const scoreResult = await sql`
+              SELECT bluesky_feed.calculate_relevance(
+                ${post.record.text},
+                ${hashtags},
+                ${post.author.did}
+              ) as score
+            `
+            relevanceScore = scoreResult[0]?.score || 0.1
+          } catch (scoreError) {
+            console.error("[v0] Error calculating relevance:", scoreError)
+            // Fallback to basic scoring
+            relevanceScore = Math.min(text.length / 280, 1.0)
+          }
 
           // Insert into database
           try {
@@ -238,6 +252,15 @@ export async function GET(request: NextRequest) {
               ON CONFLICT (uri) DO NOTHING
             `
             postsIndexed++
+            
+            // Update author trust score based on this post's relevance
+            if (relevanceScore > 0.3) {
+              try {
+                await sql`SELECT bluesky_feed.update_author_trust(${post.author.did}, ${relevanceScore})`
+              } catch (trustError) {
+                // Non-critical, continue processing
+              }
+            }
           } catch (dbError) {
             console.error("[v0] Database insert error:", dbError)
           }
