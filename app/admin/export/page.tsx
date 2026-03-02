@@ -371,7 +371,7 @@ function PreviewRecord({ record, type }: { record: any; type: string }) {
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span>{record.post_count} posts</span>
-          <span>Relevance: {(record.avg_relevance * 100).toFixed(0)}%</span>
+          <span>Relevance: {record.avg_relevance != null ? (record.avg_relevance * 100).toFixed(0) : 0}%</span>
         </div>
       </div>
     )
