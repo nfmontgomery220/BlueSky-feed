@@ -33,8 +33,13 @@
 --   7. top_domains should be text[] ARRAY not jsonb
 -- ============================================================
 
--- Drop and recreate aggregate_to_hourly with correct column names
-CREATE OR REPLACE FUNCTION bluesky_feed.aggregate_to_hourly()
+-- STEP 1: Drop existing functions (required because return types are changing)
+DROP FUNCTION IF EXISTS bluesky_feed.cleanup_old_data();
+DROP FUNCTION IF EXISTS bluesky_feed.aggregate_to_daily();
+DROP FUNCTION IF EXISTS bluesky_feed.aggregate_to_hourly();
+
+-- STEP 2: Recreate aggregate_to_hourly with correct column names
+CREATE FUNCTION bluesky_feed.aggregate_to_hourly()
 RETURNS TABLE(aggregated_count integer, deleted_count integer)
 LANGUAGE plpgsql
 AS $function$
@@ -86,10 +91,8 @@ BEGIN
 END;
 $function$;
 
--- Fix aggregate_to_daily function to match table schema
--- feed_stats_daily likely has: date, posts_count, unique_authors, posts_with_images, posts_with_video, posts_with_links
-
-CREATE OR REPLACE FUNCTION bluesky_feed.aggregate_to_daily()
+-- STEP 3: Recreate aggregate_to_daily function to match table schema
+CREATE FUNCTION bluesky_feed.aggregate_to_daily()
 RETURNS TABLE(aggregated_count integer)
 LANGUAGE plpgsql
 AS $function$
@@ -131,8 +134,8 @@ BEGIN
 END;
 $function$;
 
--- Fix cleanup_old_data to return proper counts
-CREATE OR REPLACE FUNCTION bluesky_feed.cleanup_old_data()
+-- STEP 4: Recreate cleanup_old_data to return proper counts
+CREATE FUNCTION bluesky_feed.cleanup_old_data()
 RETURNS TABLE(posts_deleted integer, hourly_deleted integer)
 LANGUAGE plpgsql
 AS $function$
