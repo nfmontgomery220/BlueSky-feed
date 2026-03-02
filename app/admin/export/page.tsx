@@ -5,11 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Download, FileJson, FileSpreadsheet, FileText, Loader2, Database, Users, Hash, Calendar, BarChart3 } from "lucide-react"
 import Link from "next/link"
 
@@ -174,31 +170,15 @@ export default function ExportPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Output Format</Label>
-                  <Select value={filters.format} onValueChange={(v) => setFilters(f => ({ ...f, format: v }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="json">
-                        <div className="flex items-center gap-2">
-                          <FileJson className="h-4 w-4" />
-                          JSON
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="csv">
-                        <div className="flex items-center gap-2">
-                          <FileSpreadsheet className="h-4 w-4" />
-                          CSV
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="jsonl">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          JSON Lines
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <select 
+                    value={filters.format} 
+                    onChange={(e) => setFilters(f => ({ ...f, format: e.target.value }))}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                    <option value="jsonl">JSON Lines</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -270,18 +250,17 @@ export default function ExportPage() {
 
                   <div className="space-y-2">
                     <Label>Media Filter</Label>
-                    <Select value={filters.hasMedia} onValueChange={(v) => setFilters(f => ({ ...f, hasMedia: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All posts" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">All posts</SelectItem>
-                        <SelectItem value="true">Has any media</SelectItem>
-                        <SelectItem value="images">Has images</SelectItem>
-                        <SelectItem value="video">Has video</SelectItem>
-                        <SelectItem value="links">Has external links</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <select 
+                      value={filters.hasMedia} 
+                      onChange={(e) => setFilters(f => ({ ...f, hasMedia: e.target.value }))}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="">All posts</option>
+                      <option value="true">Has any media</option>
+                      <option value="images">Has images</option>
+                      <option value="video">Has video</option>
+                      <option value="links">Has external links</option>
+                    </select>
                   </div>
                 </CardContent>
               </Card>
@@ -325,38 +304,7 @@ export default function ExportPage() {
                 )}
                 
                 {preview ? (
-                  <Tabs defaultValue="formatted">
-                    <TabsList>
-                      <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                      <TabsTrigger value="raw">Raw JSON</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="formatted">
-                      <ScrollArea className="h-[600px] rounded-md border">
-                        <div className="p-4">
-                          {preview.records ? (
-                            <div className="space-y-4">
-                              {preview.records.map((record: any, i: number) => (
-                                <div key={i} className="rounded-lg border p-4">
-                                  <PreviewRecord record={record} type={filters.type} />
-                                </div>
-                              ))}
-                            </div>
-                          ) : filters.type === "all" ? (
-                            <AllExportPreview data={preview} />
-                          ) : (
-                            <pre className="text-sm">{JSON.stringify(preview, null, 2)}</pre>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="raw">
-                      <ScrollArea className="h-[600px] rounded-md border bg-muted/50">
-                        <pre className="p-4 text-xs font-mono">
-                          {JSON.stringify(preview, null, 2)}
-                        </pre>
-                      </ScrollArea>
-                    </TabsContent>
-                  </Tabs>
+                  <PreviewPanel preview={preview} type={filters.type} />
                 ) : (
                   <div className="flex h-[600px] items-center justify-center rounded-md border border-dashed">
                     <div className="text-center">
@@ -445,6 +393,61 @@ function PreviewRecord({ record, type }: { record: any; type: string }) {
   }
   
   return <pre className="text-xs">{JSON.stringify(record, null, 2)}</pre>
+}
+
+function PreviewPanel({ preview, type }: { preview: any; type: string }) {
+  const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted")
+  
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setViewMode("formatted")}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            viewMode === "formatted" 
+              ? "bg-primary text-primary-foreground" 
+              : "bg-muted hover:bg-muted/80"
+          }`}
+        >
+          Formatted
+        </button>
+        <button
+          onClick={() => setViewMode("raw")}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            viewMode === "raw" 
+              ? "bg-primary text-primary-foreground" 
+              : "bg-muted hover:bg-muted/80"
+          }`}
+        >
+          Raw JSON
+        </button>
+      </div>
+      
+      {viewMode === "formatted" ? (
+        <div className="h-[600px] overflow-auto rounded-md border p-4">
+          {preview.records ? (
+            <div className="space-y-4">
+              {preview.records.map((record: any, i: number) => (
+                <div key={i} className="rounded-lg border p-4">
+                  <PreviewRecord record={record} type={type} />
+                </div>
+              ))}
+            </div>
+          ) : type === "all" ? (
+            <AllExportPreview data={preview} />
+          ) : (
+            <pre className="text-sm">{JSON.stringify(preview, null, 2)}</pre>
+          )}
+        </div>
+      ) : (
+        <div className="h-[600px] overflow-auto rounded-md border bg-muted/50 p-4">
+          <pre className="text-xs font-mono">
+            {JSON.stringify(preview, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function AllExportPreview({ data }: { data: any }) {
