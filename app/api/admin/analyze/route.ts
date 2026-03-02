@@ -21,7 +21,14 @@ const ClassificationSchema = z.object({
 
 export async function POST() {
   try {
-    const sql = neon(process.env.DATABASE_URL!)
+    const connectionString = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
+    if (!connectionString) {
+      return NextResponse.json(
+        { error: "Database connection not configured" },
+        { status: 500 }
+      )
+    }
+    const sql = neon(connectionString)
     
     // Get unanalyzed posts (limit to 20 for manual runs)
     const postsToAnalyze = await sql`

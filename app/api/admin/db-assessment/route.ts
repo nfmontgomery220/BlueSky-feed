@@ -5,7 +5,14 @@ export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const sql = neon(process.env.DATABASE_URL!)
+    const connectionString = process.env.bfc_DATABASE_URL || process.env.DATABASE_URL
+    if (!connectionString) {
+      return NextResponse.json(
+        { error: "Database connection not configured" },
+        { status: 500 }
+      )
+    }
+    const sql = neon(connectionString)
     
     // Get table schemas for key tables
     const tableNames = ['posts', 'feed_stats_hourly', 'feed_stats_daily', 'hashtag_stats']
